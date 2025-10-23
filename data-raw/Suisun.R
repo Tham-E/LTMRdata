@@ -7,45 +7,78 @@ require(lubridate)
 require(LTMRdata)
 require(readxl)
 require(tidyr)
+version <- NA
+
+link <- ifelse(is.na(version), "https://pasta.lternet.edu/package/data/eml/edi/1947/newest",
+               paste0("https://pasta.lternet.edu/package/data/eml/edi/1947/1/", version))
+
+tableLinks <- read.delim(link, header = F) %>%
+  .[[1]]%>%
+  paste0("https://pasta.lternet.edu/package/data/eml/edi/1947/1/",.)
+
+tableNames <- lapply(tableLinks, function(x) {
+  entityName <- read_html(gsub("data", "name", x)) %>%
+    html_text()
+
+  data.frame(id = gsub(".*\\/", "", x),
+             name = entityName,
+             url = x)
+}) %>%
+  bind_rows()
+
 
 # Must still reach out to Teejay (taorear@ucdavis.edu) to get the Access db
-unzip(file.path("data-raw", "Suisun", "SuisunMarshFish2020_1_29_24.accdb"), exdir = tempdir())
-db_path <- file.path(tempdir(), "SuisunMarshFish2020_1_29_24.accdb")
-
-source(file.path("data-raw", "bridgeAccess.R"))
-
-keepTables <- c("AgesBySizeMo", "Catch", "Depth",
-                "Sample", "StationsLookUp", "TrawlEffort")
-
-suisunMarshTables <- bridgeAccess(file.path("data-raw", "Suisun", "SuisunMarshFish2020_1_29_24.accdb"),
-                          tables = keepTables,
-                          script = file.path("data-raw", "connectAccess.R"))
+# unzip(file.path("data-raw", "Suisun", "SuisunMarshFish2020_1_14_23.zip"), exdir = tempdir())
+# db_path <- file.path(tempdir(), "SuisunMarshFish2020_1_14_23.accdb")
+#
+# source(file.path("data-raw", "bridgeAccess.R"))
+#
+# keepTables <- c("AgesBySizeMo", "Catch", "Depth",
+#                 "Sample", "StationsLookUp", "TrawlEffort")
+#
+# suisunMarshTables <- bridgeAccess(db_path,
+#                           tables = keepTables,
+#                           script = file.path("data-raw", "connectAccess.R"))
 
 # # If you've chosen to read csv --------------------------------------------
-# suisunMarshTables <- list()
-#
-# suisunMarshTables$Depth <- read_csv(file.path("data-raw", "Suisun", "Depth.csv"),
-#                                     col_types=cols_only(SampleRowID="c", Depth="d"))
-#
-# suisunMarshTables$StationsLookUp <- read_csv(file.path("data-raw", "Suisun", "StationsLookUp.csv"),
-#                                              col_types=cols_only(StationCode="c", x_WGS84="d", y_WGS84="d"))
-#
-# suisunMarshTables$TrawlEffort <- read_csv(file.path("data-raw", "Suisun", "TrawlEffort.csv"),
-#                                           col_types = cols_only(SampleRowID="c", TowDuration="d", TrawlComments="c"))
-#
-# suisunMarshTables$AgesBySizeMo <- read_csv(file.path("data-raw", "Suisun", "AgesBySizeMo.csv"),
-#                                            col_types = cols_only(Class="c", Month="d", Min="d", Max="d", OrganismCode="c"),
-#                                            na = "N/A")
-#
-# suisunMarshTables$Sample <- read_csv(file.path("data-raw", "Suisun", "Sample.csv"),
-#                                      col_types = cols_only(SampleRowID="c", MethodCode="c", StationCode="c",
-#                                                            SampleDate="c", SampleTime="c",
-#                                                            QADone="l", WaterTemperature="d", DO="d", PctSaturation="d",
-#                                                            Secchi="d", SpecificConductance="d", TideCode="c"))
-#
-# suisunMarshTables$Catch <- read_csv(file.path("data-raw", "Suisun", "Catch.csv"), na=c("NA", "n/p"),
-#                                     col_types = cols_only(SampleRowID="c", OrganismCode="c", StandardLength="d",
-#                                                           Dead="c", Count="d", CatchComments="c"))
+suisunMarshTables <- list()
+
+suisunMarshTables$Depth <- read_csv(tableNames %>%
+                                      dplyr::filter(grepl("Depth", name)) %>%
+                                      pull(url),
+                                    col_types=cols_only(SampleRowID="c", Depth="d"))
+
+suisunMarshTables$StationsLookUp <- read_csv(tableNames %>%
+                                               dplyr::filter(grepl("StationsLookUp", name)) %>%
+                                               pull(url),
+                                             col_types=cols_only(StationCode="c", x_WGS84="d", y_WGS84="d"))
+
+suisunMarshTables$TrawlEffort <- read_csv(tableNames %>%
+                                            dplyr::filter(grepl("TrawlEffort", name)) %>%
+                                            pull(url),
+                                          col_types = cols_only(SampleRowID="c", TowDuration="d", TrawlComments="c"))
+
+
+suisunMarshTables$AgesBySizeMo <- read_csv(tableNames %>%
+                                             dplyr::filter(grepl("AgesBySizeMo", name)) %>%
+                                             pull(url),
+                                           col_types = cols_only(Class="c", Month="d", Min="d", Max="d", OrganismCode="c"),
+                                           na = "N/A")
+
+suisunMarshTables$Sample <- read_csv(tableNames %>%
+                                       dplyr::filter(grepl("Sample", name)) %>%
+                                       pull(url),
+                                     col_types = cols_only(SampleRowID="c", MethodCode="c", StationCode="c",
+                                                           SampleDate="c", SampleTime="c",
+                                                           QADone="l", WaterTemperature="d", DO="d", PctSaturation="d",
+                                                           Secchi="d", SpecificConductance="d", TideCode="c"))
+
+suisunMarshTables$Catch <- read_csv(tableNames %>%
+                                      dplyr::filter(grepl("Catch", name)) %>%
+                                      pull(url),
+                                    na=c("NA", "n/p"),
+                                    col_types = cols_only(SampleRowID="c", OrganismCode="c", StandardLength="d",
+                                                          Dead="c", Count="d", CatchComments="c"))
 
 # Depth data --------------------------------------------------------------
 
@@ -86,7 +119,8 @@ age_size_suisun <- suisunMarshTables$AgesBySizeMo %>%
 #Removing salinity because data do not correspond well with conductivity
 sample_suisun <- suisunMarshTables$Sample %>%
   transmute(across(c(SampleRowID, MethodCode, StationCode, SampleTime), as.character),
-            SampleDate = parse_date_time(SampleDate, "%Y-%m-%d", tz="America/Los_Angeles"),
+            SampleDate = parse_date_time(SampleDate, orders = "%m/%d/%Y %H:%M", tz="America/Los_Angeles"),
+            SampleTime = parse_date_time(SampleTime, orders = "%m/%d/%Y %H:%M:%S", tz="America/Los_Angeles"),
             QADone = as.logical(QADone),
             across(c(WaterTemperature, DO, PctSaturation, Secchi, SpecificConductance), as.double),
             TideCode = as.character(TideCode)) %>%
@@ -154,26 +188,26 @@ catch_suisun <- suisunMarshTables$Catch %>%
 #   write_csv("~/Suisun comments.csv")
 
 ## For future updates, create the csv files as follows
- #old<-read_excel(file.path("data-raw", "Suisun", "Suisun comments.xlsx"))%>%mutate(ID=paste(SampleID, Taxa, CatchComments))
- #new<-dplyr::filter(catch_suisun, StandardLength==0 & !is.na(CatchComments))%>%
- #mutate(SampleRowID=paste("{",SampleRowID,"}",sep=""),
-  #      SampleID=paste("Suisun",SampleRowID,sep=" "),
-  #      Min_length=ifelse(grepl(">",CatchComments),1,as.numeric(NA)),
-  #      Length=ifelse(grepl("~",CatchComments)|grepl("about",CatchComments),1,as.numeric(NA)),
-  #      Max_length=ifelse(grepl("<",CatchComments),1,as.numeric(NA)),
-  #      Lifestage=ifelse(grepl("YOY",CatchComments),"YOY",
-  #                       ifelse(grepl("larva",CatchComments),"Larval",
-  #                              ifelse(grepl("uvenile",CatchComments),"Juvenile",
-  #                                     ifelse(grepl("dult",CatchComments),"Adult",as.character(NA))))),
-  #      Lifestage=ifelse(grepl("age 0",CatchComments),"Age-0",
-  #                       ifelse(grepl("age 1",CatchComments),"Age-1",
-  #                              ifelse(grepl("age 2",CatchComments),"Age-2+",Lifestage))),
-  #      Ignore=ifelse(grepl("egg",CatchComments)|grepl("ovi",CatchComments)|grepl("OVI",CatchComments),1,as.numeric(NA)),
-  #      ID=paste(SampleID, Taxa, CatchComments)
-  #     )%>%
- #dplyr::filter(!ID%in%old$ID)%>%
- #dplyr::select(SampleRowID, Station, Date, Datetime, SampleID, TrawlComments, Taxa, Count, CatchComments,Min_length,Length,Max_length,Lifestage,Ignore)%>%
-  # write_csv("~/Suisun comments.csv")
+#old<-read_excel(file.path("data-raw", "Suisun", "Suisun comments.xlsx"))%>%mutate(ID=paste(SampleID, Taxa, CatchComments))
+#new<-dplyr::filter(catch_suisun, StandardLength==0 & !is.na(CatchComments))%>%
+#mutate(SampleRowID=paste("{",SampleRowID,"}",sep=""),
+#      SampleID=paste("Suisun",SampleRowID,sep=" "),
+#      Min_length=ifelse(grepl(">",CatchComments),1,as.numeric(NA)),
+#      Length=ifelse(grepl("~",CatchComments)|grepl("about",CatchComments),1,as.numeric(NA)),
+#      Max_length=ifelse(grepl("<",CatchComments),1,as.numeric(NA)),
+#      Lifestage=ifelse(grepl("YOY",CatchComments),"YOY",
+#                       ifelse(grepl("larva",CatchComments),"Larval",
+#                              ifelse(grepl("uvenile",CatchComments),"Juvenile",
+#                                     ifelse(grepl("dult",CatchComments),"Adult",as.character(NA))))),
+#      Lifestage=ifelse(grepl("age 0",CatchComments),"Age-0",
+#                       ifelse(grepl("age 1",CatchComments),"Age-1",
+#                              ifelse(grepl("age 2",CatchComments),"Age-2+",Lifestage))),
+#      Ignore=ifelse(grepl("egg",CatchComments)|grepl("ovi",CatchComments)|grepl("OVI",CatchComments),1,as.numeric(NA)),
+#      ID=paste(SampleID, Taxa, CatchComments)
+#     )%>%
+#dplyr::filter(!ID%in%old$ID)%>%
+#dplyr::select(SampleRowID, Station, Date, Datetime, SampleID, TrawlComments, Taxa, Count, CatchComments,Min_length,Length,Max_length,Lifestage,Ignore)%>%
+# write_csv("~/Suisun comments.csv")
 
 
 
@@ -186,6 +220,7 @@ catch_fix<-catch_suisun%>%
   dplyr::select(Taxa, StandardLength, Count, SampleID)%>%
   dplyr::filter(StandardLength>0)
 
+
 catch_comments_suisun <- read_excel(file.path("data-raw", "Suisun", "Suisun comments.xlsx"))%>% # Read in translated excel comments
   dplyr::filter(is.na(Ignore))%>% #Remove "ignored" comments that have nothing to do with length.
   mutate(Lifestage=recode(Lifestage, YOY="Age-0", Larval="Age-0", Yearling="Age-1"),
@@ -194,7 +229,7 @@ catch_comments_suisun <- read_excel(file.path("data-raw", "Suisun", "Suisun comm
            Lifestage=="Adult" & Taxa%in%c("Tridentiger bifasciatus", "Acanthogobius flavimanus") ~ "Age-1+",
            TRUE ~ Lifestage
          ),
-         Month=month(parse_date_time(Datetime, "%Y-%m-%d %H:%M:%S", tz="America/Los_Angeles")))%>%
+         Month=month(parse_date_time(Date, "%Y-%m-%d %H:%M:%S", tz="America/Los_Angeles")))%>%
   left_join(Species%>% # Add species names
               dplyr::select(OrganismCode=SMF_Code, Taxa)%>%
               dplyr::filter(!is.na(OrganismCode) & !is.na(Taxa)),
@@ -282,9 +317,9 @@ Suisun <- Suisun1%>%
          StandardLength=if_else(is.na(Count), NA_real_, StandardLength),
          CatchComments=if_else(is.na(Count), NA_character_, CatchComments))%>%
   dplyr::select(Source, Station, Latitude, Longitude, Date, Datetime, Depth, SampleID, Method, Tide, # Re-order variables
-         Sal_surf, Temp_surf=Temperature, Secchi,
-         Tow_duration=TowDuration, Tow_area, Taxa,
-         Length=StandardLength, Count, Length_NA_flag, Notes_catch=CatchComments, Notes_tow=TrawlComments)%>%
+                Sal_surf, Temp_surf=Temperature, Secchi,
+                Tow_duration=TowDuration, Tow_area, Taxa,
+                Length=StandardLength, Count, Length_NA_flag, Notes_catch=CatchComments, Notes_tow=TrawlComments)%>%
   group_by(across(-Count))%>% # Add up any new multiples after removing lifestages
   summarise(Count=sum(Count), .groups="drop")%>%
   group_by(SampleID)%>%
