@@ -9,9 +9,6 @@ library(stringr)
 require(LTMRdata)
 library(rvest)
 
-# downloading data because the dataset is too huge to keep on file
-options(timeout = 99999)
-
 # Find the newest revision
 # IF you want to pull a specific version of a package, which is a number
 version <- NA
@@ -49,8 +46,8 @@ data <- bind_rows(
     pull(url) %>%
     read_csv(col_types = cols_only(StationCode = "c", SampleDate = "c", SampleTime = "c",
                                    TowNumber = "c", MethodCode = "c", GearConditionCode = "i",
-                                   FlowDebris = "c", SpecificConductance = "d",
-                                   WaterTemp = "d", Turbidity = "d", Secchi = "d",
+                                   FlowDebris = "c",
+                                   SpecificConductance = "d", WaterTemp = "d", Secchi = "d",
                                    Volume = "d", SamplingDirection = "c", MarkCode="c", RaceByLength="c",
                                    OrganismCode = "c", ForkLength = "d", Count = "d")),
   # 2002-present trawl
@@ -59,8 +56,8 @@ data <- bind_rows(
     pull(url) %>%
     read_csv(col_types = cols_only(StationCode = "c", SampleDate = "c", SampleTime = "c",
                                    TowNumber = "c", MethodCode = "c", GearConditionCode = "i",
-                                   FlowDebris = "c", SpecificConductance = "d",
-                                   WaterTemp = "d", Turbidity = "d", Secchi = "d",
+                                   FlowDebris = "c",
+                                   SpecificConductance = "d", WaterTemp = "d", Secchi = "d",
                                    Volume = "d", SamplingDirection = "c", MarkCode="c", RaceByLength="c",
                                    OrganismCode = "c", ForkLength = "d", Count = "d")),
   # 1976-present beach seine
@@ -70,18 +67,20 @@ data <- bind_rows(
     read_csv(col_types = cols_only(StationCode = "c", SampleDate = "c", SampleTime = "c",
                                    TowNumber = "c", MethodCode = "c", SeineDepth = "d",
                                    GearConditionCode = "i", FlowDebris = "c",
-                                   SpecificConductance = "d", WaterTemp = "d",
-                                   Turbidity = "d", Secchi = "d",
+                                   SpecificConductance = "d", WaterTemp = "d", Secchi = "d",
                                    Volume = "d", SamplingDirection = "c", MarkCode="c", RaceByLength="c",
                                    OrganismCode = "c", ForkLength = "d", Count = "d"))
 )
 
 # Check to see if there are new Taxa added to the dataset:
+source(file.path("data-raw","Species.R"))
+
 USFWS_Species <- Species %>%
   select(USFWS_Code, Taxa) %>%
   dplyr::filter(!is.na(USFWS_Code))
 
 New_Species <- data %>%
+  mutate(SampleDate=as.Date.character(SampleDate,tryFormats = c("%m/%d/%Y")))%>%
   group_by(OrganismCode) %>%
   slice(1) %>%
   transmute(Year = year(SampleDate),
@@ -94,13 +93,13 @@ if (nrow(New_Species) > 0) stop("New species entry, update the Species_Code.csv"
 
 DJFMP<-data%>%
   dplyr::rename(Station = StationCode, Date = SampleDate, Time = SampleTime, Temp_surf = WaterTemp,
-         TurbidityNTU = Turbidity, Method = MethodCode, Tow_volume = Volume, Depth=SeineDepth,
+         Method = MethodCode, Tow_volume = Volume, Depth=SeineDepth,
          Tow_direction = SamplingDirection, Length = ForkLength,Conductivity=SpecificConductance) %>%
   dplyr::filter(is.na(GearConditionCode) | !GearConditionCode%in%c(3,4,9))%>%
   mutate(Tow_volume = if_else(FlowDebris=="Y", NA_real_, Tow_volume, missing=Tow_volume),
          Secchi = Secchi*100, # convert Secchi to cm
          Source = "DJFMP",
-         Date = parse_date_time(Date, "%Y-%m-%d", tz = "America/Los_Angeles"),
+         Date = parse_date_time(Date, "%m/%d/%Y", tz = "America/Los_Angeles"),
          Time = parse_date_time(Time, "%H:%M:%S", tz = "America/Los_Angeles"),
          Datetime = parse_date_time(ifelse(is.na(Time), NA_character_, paste0(Date, " ", hour(Time), ":", minute(Time))), "%Y-%m-%d %H:%M", tz="America/Los_Angeles"),
          # Removing conductivity data from dates before it was standardized
@@ -135,7 +134,7 @@ DJFMP<-data%>%
   left_join(USFWS_Species,
             by=c("OrganismCode"="USFWS_Code")) %>%
   mutate(SampleID=paste(Source, SampleID), # Add variable for unique (across all studies) sampleID
-         Taxa=str_remove(Taxa, " \\((.*)")
+         #Taxa=str_remove(Taxa, " \\((.*)")
          )%>% # Remove life stage info from Taxa names
   # dplyr::rename(Taxa=ScientificName)%>%
   select(-OrganismCode)%>%
@@ -146,7 +145,7 @@ DJFMP<-data%>%
   mutate(Count=if_else(Length_NA_flag=="No fish caught", 0, Count, missing=Count),
          Taxa = ifelse(Length_NA_flag == "No fish caught" & !is.na(Length_NA_flag), NA, Taxa))%>%
   select(Source, Station, Latitude, Longitude, Date, Datetime, Depth, SampleID, Method, Sal_surf,
-         Temp_surf, TurbidityNTU, Secchi, Tow_volume, Tow_direction, Taxa, Length, Count, Length_NA_flag)
-
+         Temp_surf, Secchi, Tow_volume, Tow_direction, Taxa, Length, Count, Length_NA_flag)
+summary(DJFMP)
 # Save compressed data to /data
-usethis::use_data(DJFMP, overwrite=TRUE, compress="xz")
+usethis::use_data(DJFMP, overwrite=TRUE)

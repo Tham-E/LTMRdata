@@ -20,10 +20,13 @@ unzip(Path,files="SKT.accdb",exdir=Path_origin)
 # MS access database set up----
 # File path to Access database (Salvage)
 db_path <- file.path(tempdir(),"Skt.accdb")
-
+rBit="x32"
+officeBit="x32"
 source(file.path("data-raw", "bridgeAccess.R"))
 
 keepTables <- c("StationsSKT", "tblSample", "tblCatch", "tblFishInfo")
+
+
 
 SKT_Data <- bridgeAccess(db_path,
                          tables = keepTables,
@@ -38,7 +41,7 @@ SKT_Data <- bridgeAccess(db_path,
 #                                                      LongDec="d", LongMin="d", LongSec="d"))
 #
 # SKT_Data$tblSample <- read_csv(file.path("data-raw", "SKT", "tblSample.csv"),
-#                             col_types = cols_only(SampleRowID = "i", SampleDate = "c", Station = "c",
+#                             col_types = cols_only(SampleRowID = "i", SampleDate = "c", StationCode = "c",
 #                                                   SampleTimeStart = "c", SurveyNumber = "i",
 #                                                   WaterTemperature = "d", TideCode = "i", DepthBottom = "d",
 #                                                   Secchi = "d", ConductivityTop = "d",
@@ -70,15 +73,13 @@ SKT_Data$StationsSKT <- SKT_Data$StationsSKT%>%
 # read sample data (one row per tow)
 SKT_Data$Sample <- SKT_Data$tblSample%>%
   select(SampleRowID,SampleDate,Station,SampleTimeStart,SurveyNumber,
-         WaterTemperature,TideCode,DepthBottom,Secchi,ConductivityTop,
-         TowDirectionCode,MeterStart,MeterEnd,
-         NTU, FNU)
+         WaterTemperature,TideCode,DepthBottom,Secchi,NTU,FNU,ConductivityTop,
+         TowDirectionCode,MeterStart,MeterEnd)
+source(file.path("data-raw","Species.R"))
 {
-  SKT_Data$Sample$Station<-as.character(SKT_Data$Sample$Station)
+  #SKT_Data$tblSample$StationCode<-as.character(SKT_Data$Sample$StationCode)
   SKT_Data$Sample<-SKT_Data$Sample%>%
-    rename(Station = Station, Depth = DepthBottom, Temp_surf = WaterTemperature,
-           Survey = SurveyNumber, Date=SampleDate, Time=SampleTimeStart,
-           TurbidityNTU = NTU, TurbidityFNU = FNU)%>%
+    dplyr::rename(Depth = DepthBottom, Temp_surf = WaterTemperature, Survey = SurveyNumber, Date=SampleDate, Time=SampleTimeStart)%>%
     mutate(Date = parse_date_time(Date, "%Y-%m-%d", tz="America/Los_Angeles"),
            Time = as.POSIXct(Time, format = "%m/%d/%Y %H:%M", tz = "America/Los_Angeles"),
            # Create a new field which is a Date-Time composite
@@ -160,10 +161,9 @@ SKT <- SKT_Data$Sample %>%
          # Remove life stage info from Taxa names
          Taxa = stringr::str_remove(Taxa, " \\((.*)")) %>%
   # Reorder variables for consistency
-  dplyr::transmute(Source, Station, Latitude, Longitude, Date, Datetime, Survey,
-         Depth, SampleID, CatchRowID, Method, Tide, Sal_surf, Temp_surf,
-         TurbidityNTU, TurbidityFNU, Secchi, Tow_volume, Tow_direction, Taxa,
-         Length = ForkLength, Count, Length_NA_flag)
+  dplyr::select(Source, Station, Latitude, Longitude, Date, Datetime, Survey,
+         Depth, SampleID, CatchRowID, Method, Tide, Sal_surf, Temp_surf, Secchi,
+         NTU, FNU, Tow_volume, Tow_direction, Taxa, Length = ForkLength, Count, Length_NA_flag)
 
 
 # Just measured lengths
@@ -183,4 +183,5 @@ SKT<-SKT %>%
   distinct()
 
 # Save compressed data to /data
-usethis::use_data(SKT, SKT_measured_lengths, overwrite=TRUE, compress="xz")
+usethis::use_data(SKT, SKT_measured_lengths, overwrite=TRUE)
+rm(SKT_Data)

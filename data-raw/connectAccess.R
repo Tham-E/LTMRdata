@@ -22,7 +22,7 @@ connectAccess <- function(file,
   # RODBC::odbcDriverConnect(con, ...)
 }
 
-extractTables <- function(con, tables, out, rBit, officeBit) {
+extractTables <- function(con, tables, out) {
 
   # Pulling just the table names
   # tableNames <- RODBC::sqlTables(con, tableType = c("TABLE", "VIEW"))["TABLE_NAME"]
@@ -72,17 +72,11 @@ if (!exists("Args")) {
 
   file <- Args[1]
   out <- Args[2]
-  rBit <- Args[4]
-  officeBit <- Args[5]
-  tables <- Args[6:length(Args)]
+  tables <- Args[3:length(Args)]
 
   con <- connectAccess(file)
 
-
-
   extractTables(con = con,
                 tables = tables,
-                out = out,
-                rBit = rBit,
-                officeBit = officeBit)
+                out = out)
 }

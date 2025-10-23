@@ -69,18 +69,14 @@ bridgeAccess <- function(file, tables = "check",
 
     extractTables(con = con,
                   tables = tables,
-                  out = out,
-                  rBit = bitCheck$rBit,
-                  officeBit = bitCheck$officeBit)
+                  out = out)
   } else {
     file <- shQuote(normalizePath(file, winslash = "\\"))
     script <- shQuote(normalizePath(script, winslash = "\\"))
-    tables <- shQuote(tables)
 
     terminalOutput <- system2(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe"),
                               args = c(script,
-                                       file, out,
-                                       bitCheck, tables))
+                                       file, out, tables))
 
     readRDS(file.path(out, "savedAccessTables.rds"))
   }

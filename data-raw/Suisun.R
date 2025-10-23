@@ -188,26 +188,26 @@ catch_suisun <- suisunMarshTables$Catch %>%
 #   write_csv("~/Suisun comments.csv")
 
 ## For future updates, create the csv files as follows
-#old<-read_excel(file.path("data-raw", "Suisun", "Suisun comments.xlsx"))%>%mutate(ID=paste(SampleID, Taxa, CatchComments))
-#new<-dplyr::filter(catch_suisun, StandardLength==0 & !is.na(CatchComments))%>%
-#mutate(SampleRowID=paste("{",SampleRowID,"}",sep=""),
-#      SampleID=paste("Suisun",SampleRowID,sep=" "),
-#      Min_length=ifelse(grepl(">",CatchComments),1,as.numeric(NA)),
-#      Length=ifelse(grepl("~",CatchComments)|grepl("about",CatchComments),1,as.numeric(NA)),
-#      Max_length=ifelse(grepl("<",CatchComments),1,as.numeric(NA)),
-#      Lifestage=ifelse(grepl("YOY",CatchComments),"YOY",
-#                       ifelse(grepl("larva",CatchComments),"Larval",
-#                              ifelse(grepl("uvenile",CatchComments),"Juvenile",
-#                                     ifelse(grepl("dult",CatchComments),"Adult",as.character(NA))))),
-#      Lifestage=ifelse(grepl("age 0",CatchComments),"Age-0",
-#                       ifelse(grepl("age 1",CatchComments),"Age-1",
-#                              ifelse(grepl("age 2",CatchComments),"Age-2+",Lifestage))),
-#      Ignore=ifelse(grepl("egg",CatchComments)|grepl("ovi",CatchComments)|grepl("OVI",CatchComments),1,as.numeric(NA)),
-#      ID=paste(SampleID, Taxa, CatchComments)
-#     )%>%
-#dplyr::filter(!ID%in%old$ID)%>%
-#dplyr::select(SampleRowID, Station, Date, Datetime, SampleID, TrawlComments, Taxa, Count, CatchComments,Min_length,Length,Max_length,Lifestage,Ignore)%>%
-# write_csv("~/Suisun comments.csv")
+ #old<-read_excel(file.path("data-raw", "Suisun", "Suisun comments.xlsx"))%>%mutate(ID=paste(SampleID, Taxa, CatchComments))
+ #new<-dplyr::filter(catch_suisun, StandardLength==0 & !is.na(CatchComments))%>%
+ #mutate(SampleRowID=paste("{",SampleRowID,"}",sep=""),
+  #      SampleID=paste("Suisun",SampleRowID,sep=" "),
+  #      Min_length=ifelse(grepl(">",CatchComments),1,as.numeric(NA)),
+  #      Length=ifelse(grepl("~",CatchComments)|grepl("about",CatchComments),1,as.numeric(NA)),
+  #      Max_length=ifelse(grepl("<",CatchComments),1,as.numeric(NA)),
+  #      Lifestage=ifelse(grepl("YOY",CatchComments),"YOY",
+  #                       ifelse(grepl("larva",CatchComments),"Larval",
+  #                              ifelse(grepl("uvenile",CatchComments),"Juvenile",
+  #                                     ifelse(grepl("dult",CatchComments),"Adult",as.character(NA))))),
+  #      Lifestage=ifelse(grepl("age 0",CatchComments),"Age-0",
+  #                       ifelse(grepl("age 1",CatchComments),"Age-1",
+  #                              ifelse(grepl("age 2",CatchComments),"Age-2+",Lifestage))),
+  #      Ignore=ifelse(grepl("egg",CatchComments)|grepl("ovi",CatchComments)|grepl("OVI",CatchComments),1,as.numeric(NA)),
+  #      ID=paste(SampleID, Taxa, CatchComments)
+  #     )%>%
+ #dplyr::filter(!ID%in%old$ID)%>%
+ #dplyr::select(SampleRowID, Station, Date, Datetime, SampleID, TrawlComments, Taxa, Count, CatchComments,Min_length,Length,Max_length,Lifestage,Ignore)%>%
+  # write_csv("~/Suisun comments.csv")
 
 
 
@@ -317,9 +317,9 @@ Suisun <- Suisun1%>%
          StandardLength=if_else(is.na(Count), NA_real_, StandardLength),
          CatchComments=if_else(is.na(Count), NA_character_, CatchComments))%>%
   dplyr::select(Source, Station, Latitude, Longitude, Date, Datetime, Depth, SampleID, Method, Tide, # Re-order variables
-                Sal_surf, Temp_surf=Temperature, Secchi,
-                Tow_duration=TowDuration, Tow_area, Taxa,
-                Length=StandardLength, Count, Length_NA_flag, Notes_catch=CatchComments, Notes_tow=TrawlComments)%>%
+         Sal_surf, Temp_surf=Temperature, Secchi,
+         Tow_duration=TowDuration, Tow_area, Taxa,
+         Length=StandardLength, Count, Length_NA_flag, Notes_catch=CatchComments, Notes_tow=TrawlComments)%>%
   group_by(across(-Count))%>% # Add up any new multiples after removing lifestages
   summarise(Count=sum(Count), .groups="drop")%>%
   group_by(SampleID)%>%

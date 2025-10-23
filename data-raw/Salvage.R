@@ -16,10 +16,11 @@ download.file("https://filelib.wildlife.ca.gov/Public/Salvage/Salvage_data_FTP.a
 # MS access database set up----
 # File path to Access database (Salvage)
 db_path <- file.path(tempdir(),"Salvage_data_FTP.accdb")
-
+rBit="x32"
+officeBit="x32"
 source(file.path("data-raw", "bridgeAccess.R"))
-
-keepTables <- c("Building", "DNAandCWTRace", "LarvalFishLength", "Length",
+source(file.path("data-raw","Species.R"))
+keepTables <- c("Building", "DNAandCWTRun", "LarvalFishLength", "Length",
                 "OrganismsLookUp", "Sample", "StationsLookUp", "Catch",
                 "StudiesLookUp", "VariableCodesLookUp", "VariablesLookUp")
 
@@ -31,7 +32,7 @@ SalvageTables <- bridgeAccess(db_path,
 # ----
 # Changing some names to avoid duplicated names when joining
 SalvageTables$Sample <- SalvageTables$Sample %>%
-  rename(Comments_Sample = Comments)
+  dplyr::rename(Comments_Sample = Comments)
 
 SalvageTables$OrganismsLookUp <- SalvageTables$OrganismsLookUp %>%
   rename(Active_OrganismsLookUp = Active,
@@ -49,7 +50,7 @@ SalvageJoined <- full_join(SalvageTables$Sample, SalvageTables$Building,
   left_join(SalvageTables$OrganismsLookUp, by = "OrganismCode", multiple = "all") %>%
   left_join(SalvageTables$StudiesLookUp, by = "StudyRowID", multiple = "all") %>%
   left_join(SalvageTables$StationsLookUp, by = c("BuildingCode" = "FacilityCode"), multiple = "all")
-
+rm(SalvageTables)
 # OrganismCode 98 and 99 are Total Fish Count, Total Fish Estimate, but they are generally recorded as 0.
 # Will have to remove them from the dataset as there are fish caught during these sampling events.
 # However, there are specific instances where these are the only occurence that represents a sampling event...
@@ -185,6 +186,8 @@ SalvageStart <- SalvageJoined %>%
   } %>%
   relocate(SampleID, .after = SampleRowID)
 
+
+
 Salvage_measured_lengths <- SalvageStart %>%
   select(SampleID, Taxa, Length, LengthFrequency) %>%
   filter(!is.na(LengthFrequency)) %>% # Remove fish that weren't measured
@@ -259,5 +262,6 @@ if (nrow(SalvageStart) - nrow(Salvage) != 6) stop("The last distinct() step remo
 #   full_join(Species, by = "ScientificName") %>%
 #   relocate(Salvage_Code, .after = "TMM_Code") %>%
 #   write_csv(file.path("data-raw", "Species codes.csv"))
+rm(SalvageJoined,SalvageStart)
 
-usethis::use_data(Salvage, Salvage_measured_lengths, overwrite=TRUE, compress="xz")
+usethis::use_data(Salvage, Salvage_measured_lengths, overwrite=TRUE)
