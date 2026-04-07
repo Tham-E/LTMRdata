@@ -9,6 +9,7 @@
 ## Only run this section when needed.
 
 source(file.path("data-raw", "bridgeAccess.R"))
+options(timeout=999999999)
 officeBit="x32"
 rBit="x32"
 ## 20mm Survey url, name of zip file, and name of database within the zip file:
