@@ -7,8 +7,9 @@ require(lubridate)
 require(LTMRdata)
 require(readxl)
 require(tidyr)
+require(rvest)
 version <- NA
-
+options(timeout=999999999)
 link <- ifelse(is.na(version), "https://pasta.lternet.edu/package/data/eml/edi/1947/newest",
                paste0("https://pasta.lternet.edu/package/data/eml/edi/1947/1/", version))
 

@@ -47,24 +47,28 @@ EDSM <- bind_rows(
            col_types = cols_only(StationCode = "c", SampleDate = "c", SampleTime = "c", Tide = "c",
                                  LongitudeStart = "d", LatitudeStart = "d", TowNumber="d",
                                  GearConditionCode = "i", FlowDebris = "c",
-                                 SpecificConductanceTop = "d", WaterTempTop = "d", Secchi = "d", TopTurb="d",
+                                 SpecificConductanceTop = "d", WaterTempTop = "d", Secchi = "d", TurbidityTopNTU="d",
+                                 TurbidityTopFNU="d",
                                  BottomDepth = "d", Volume = "d", SamplingDirection = "c", MethodCode = "c",
                                  OrganismCode = "c", ForkLength = "d", Count = "d",
                                  MarkCode="c", RaceByLength="c")
-           ),
+           )%>%rename(),
   read_csv(tableNames %>%
              dplyr::filter(grepl("KDTR", name)) %>%
              pull(url),
            col_types = cols_only(StationCode = "c", SampleDate = "c", SampleTime = "c", Tide = "c",
                                  LongitudeStart = "d", LatitudeStart = "d", TowNumber="d",
-                                 SpecificConductance = "d", WaterTemp = "d", Secchi = "d", Turb="d",
+                                 SpecificConductance = "d", WaterTemp = "d", Secchi = "d", TurbidityNTU="d",
+                                 TurbidityFNU="d",
                                  BottomDepth = "d", GearConditionCode = "i", FlowDebris = "c",
                                  Volume = "d", SamplingDirection = "c", MethodCode = "c",
                                  OrganismCode = "c", ForkLength = "d", Count = "d",
                                  MarkCode="c", RaceByLength="c"))%>%
-    dplyr::rename(SpecificConductanceTop=SpecificConductance, WaterTempTop=WaterTemp,TopTurb=Turb))%>%
+    dplyr::mutate(SampleTime=paste0(SampleTime,":00"))%>%
+    dplyr::rename(SpecificConductanceTop=SpecificConductance, WaterTempTop=WaterTemp,TurbidityTopNTU=TurbidityNTU,TurbidityTopFNU=TurbidityFNU)
+  )%>%
   dplyr::rename(Temp_surf = WaterTempTop, Tow_volume = Volume, Method = MethodCode,
-         Tow_direction = SamplingDirection, Length = ForkLength, Conductivity = SpecificConductanceTop,NTU = TopTurb,
+         Tow_direction = SamplingDirection, Length = ForkLength, Conductivity = SpecificConductanceTop,NTU = TurbidityTopNTU,FNU = TurbidityTopFNU,
          Latitude=LatitudeStart, Longitude=LongitudeStart,
          Date = SampleDate, Time = SampleTime, Depth = BottomDepth, Station = StationCode, Tow = TowNumber) %>%
   dplyr::filter(is.na(GearConditionCode) | !GearConditionCode%in%c(3,4,9))%>%
