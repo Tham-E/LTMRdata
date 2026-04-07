@@ -1,6 +1,10 @@
 source(file.path("data-raw", "bridgeAccess.R"))
-db_path<-file.path("D:/LTMRdata/LTMRdata/data-raw/Suisun","SuisunMarshFish_2025.accdb")
-
+#unzip file
+zipFileName<-"SuisunMarshFish_2025.zip"
+localZipFile<-file.path("D:/LTMRdata/LTMRdata/data-raw/Suisun",zipFileName)
+unzip(zipfile=localZipFile,exdir=file.path(tempdir()))
+#connect with access
+db_path<-file.path(tempdir(),"SuisunMarshFish_2025.accdb")
 keepTables <- c("AgesBySizeMo", "Catch", "Depth",
                 "Sample", "StationsLookUp", "TrawlEffort")
 officeBit="x32"
