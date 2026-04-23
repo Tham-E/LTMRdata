@@ -52,7 +52,7 @@ EDSM <- bind_rows(
                                  BottomDepth = "d", Volume = "d", SamplingDirection = "c", MethodCode = "c",
                                  OrganismCode = "c", ForkLength = "d", Count = "d",
                                  MarkCode="c", RaceByLength="c")
-           )%>%rename(),
+           ),
   read_csv(tableNames %>%
              dplyr::filter(grepl("KDTR", name)) %>%
              pull(url),
@@ -75,7 +75,7 @@ EDSM <- bind_rows(
   dplyr::mutate(Tow_volume = if_else(FlowDebris%in%c("Y", "Yes"), NA_real_, Tow_volume, missing=Tow_volume),
          Source = "EDSM",
          Date = parse_date_time(Date, "%Y-%m-%d", tz = "America/Los_Angeles"),
-         Time = parse_date_time(Time, "%H:%M:%S", tz = "America/Los_Angeles"),
+         Time=parse_date_time(if_else(nchar(Time)==11,substr(Time,1,nchar(Time)-3),Time), "%H:%M:%S", tz = "America/Los_Angeles"),
          Datetime = parse_date_time(if_else(is.na(Time), NA_character_, paste0(Date, " ", hour(Time), ":", minute(Time))), "%Y-%m-%d %H:%M", tz="America/Los_Angeles"),
          # Removing conductivity data from dates before it was standardized
          Conductivity = if_else(Date<parse_date_time("2019-06-01", "%Y-%m-%d", tz="America/Los_Angeles"), NA_real_, Conductivity),
@@ -122,7 +122,7 @@ EDSM <- bind_rows(
          Taxa=str_remove(Taxa, " \\((.*)"), # Remove life stage info from Taxa names
          Count=if_else(Length_NA_flag=="No fish caught", 0, Count, missing=Count))%>% # Transform all counts for 'No fish caught' to 0.
   dplyr::select(Source, Station, Latitude, Longitude, Date, Datetime, Depth, SampleID, Method, Tide, Sal_surf,
-         Temp_surf, Secchi, NTU, Tow_volume, Tow_direction, Taxa, Length, Count, Length_NA_flag)
+         Temp_surf, Secchi, FNU,NTU, Tow_volume, Tow_direction, Taxa, Length, Count, Length_NA_flag)
 summary(EDSM%>%mutate(Method=factor(Method)))
 rm(tableNames)
 # Save compressed data to /data

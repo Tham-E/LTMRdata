@@ -53,6 +53,6 @@ QLS <-read.csv(tableNames %>%
   mutate(Source="QLS",
          Latitude = 37.825612769565474,
          Longitude =-121.59584120116043)%>%
-  select(Source,Latitude,Longitude,Date,Taxa,Count,Comments)
+  select(Source,Latitude,Longitude,Facility,Date,Taxa,Count,Comments)
 
 usethis::use_data(QLS, overwrite=TRUE, compress="xz")

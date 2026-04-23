@@ -149,11 +149,12 @@ FMWT<-FMWT_Tables$Sample%>% # Start with sample to ensure samples without any ca
          Secchi_estimated=SecchiEstimated, Survey=SurveyNumber, Cable_length=CableOut,
          Wind_direction=WindDirection)%>%
   select(-ConductivityTop, -ConductivityBottom, -LengthFrequency, -TotalMeasured,
-         -SampleRowID, -Time, -Catch, -Turbidity, -Microcystis,
+         -SampleRowID, -Time, -Catch, -Microcystis,
          -Wind_direction, -Temp_bott, -Weather, -Waves, -Sal_bott)%>% # Remove extra variables
   select(Source, Station, Latitude, Longitude, Date, Datetime, Survey, # Reorder variables for consistency
-         Depth, SampleID, CatchRowID, Method, Tide, Sal_surf, Temp_surf, Secchi, Secchi_estimated,
-         Tow_volume, Tow_direction, Cable_length, Taxa, Length, Count, Length_NA_flag)
+         Depth, SampleID, CatchRowID, Method, Tide, Sal_surf, Temp_surf, Secchi, Secchi_estimated,Turbidity,
+         Tow_volume, Tow_direction, Cable_length, Taxa, Length, Count, Length_NA_flag)%>%
+  rename(NTU=Turbidity)
 
 # Just measured lengths
 

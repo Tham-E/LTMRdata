@@ -1,9 +1,21 @@
 source(file.path("data-raw", "bridgeAccess.R"))
+
+#online source----
+Path<-file.path(tempdir(), "SuisunMarshFish_2025.accdb")
+Path_origin<-file.path(tempdir())
+#Downloading MWT_data.zip----
+download.file("https://drive.usercontent.google.com/download?id=1rHMO5Kqqz-GdoSOqmUtCEOn4kQOTfSvS&export=download&confirm=t&uuid=2ee5429d-7a3e-481e-b0b7-daefd0c4ec59", Path, mode="wb",method="libcurl")
+
+
+
+
 #unzip file
 zipFileName<-"SuisunMarshFish_2025.zip"
 localZipFile<-file.path("D:/LTMRdata/LTMRdata/data-raw/Suisun",zipFileName)
 unzip(zipfile=localZipFile,exdir=file.path(tempdir()))
 #connect with access
+
+
 db_path<-file.path(tempdir(),"SuisunMarshFish_2025.accdb")
 keepTables <- c("AgesBySizeMo", "Catch", "Depth",
                 "Sample", "StationsLookUp", "TrawlEffort")
@@ -12,6 +24,11 @@ rBit="x32"
 data <- bridgeAccess(db_path,
                      tables = keepTables,
                      script = file.path("data-raw", "connectAccess.R"))
+
+data <- bridgeAccess(Path,
+                     tables = keepTables,
+                     script = file.path("data-raw", "connectAccess.R"))
+
 library(dplyr)
 library(lubridate)
 library(wql)
@@ -174,7 +191,7 @@ Suisun1 <- Catch2%>%
   group_by(SampleID, Taxa, SizeGroup)%>% # This is where size group comes in, now all calculations are performed separately for each size group
   mutate(TotalMeasured=sum(Count, na.rm=T))%>% # Calculate the total number of fish measured
   ungroup()%>%
-  left_join(catch_suisun2%>% # Join to data with total catch of fish. Using a full join
+  left_join(Catch2%>% # Join to data with total catch of fish. Using a full join
               dplyr::select(SampleID, Taxa, Count, SizeGroup)%>%
               group_by(SampleID, Taxa, SizeGroup)%>%
               summarise(TotalCatch=sum(Count, na.rm=T), .groups="drop"), # Calculate total catch
@@ -213,7 +230,7 @@ Suisun <- Suisun1%>%
   mutate(Count=if_else(Length_NA_flag=="No fish caught", 0, Count, missing=Count)) # Transform all counts for 'No fish caught' to 0.
 
 # Just measured lengths
-Suisun_measured_lengths <- catch_suisun2%>%
+Suisun_measured_lengths <- Catch2%>%
   dplyr::filter(StandardLength!=0)%>%
   mutate(Taxa=stringr::str_remove(Taxa, " \\((.*)"))%>% # Remove life stage from Taxa
   dplyr::select(SampleID, Taxa, Dead, Length=StandardLength, Count)
