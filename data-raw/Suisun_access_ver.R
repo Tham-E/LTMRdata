@@ -1,13 +1,11 @@
 source(file.path("data-raw", "bridgeAccess.R"))
+source(file.path("data-raw", "Data_check.R"))
 
 #online source----
 Path<-file.path(tempdir(), "SuisunMarshFish_2025.accdb")
 Path_origin<-file.path(tempdir())
 #Downloading MWT_data.zip----
 download.file("https://drive.usercontent.google.com/download?id=1rHMO5Kqqz-GdoSOqmUtCEOn4kQOTfSvS&export=download&confirm=t&uuid=2ee5429d-7a3e-481e-b0b7-daefd0c4ec59", Path, mode="wb",method="libcurl")
-
-
-
 
 # #unzip file (Leaving in case online download does not work)
 # zipFileName<-"SuisunMarshFish_2025.zip"
@@ -22,18 +20,22 @@ keepTables <- c("AgesBySizeMo", "Catch", "Depth",
                 "Sample", "StationsLookUp", "TrawlEffort")
 officeBit="x32"
 rBit="x32"
-data <- bridgeAccess(db_path,
-                     tables = keepTables,
-                     script = file.path("data-raw", "connectAccess.R"))
+# data <- bridgeAccess(db_path,
+#                      tables = keepTables,
+#                      script = file.path("data-raw", "connectAccess.R"))
 
 data <- bridgeAccess(Path,
                      tables = keepTables,
                      script = file.path("data-raw", "connectAccess.R"))
 
+library(wql)
+library(readr)
 library(dplyr)
 library(lubridate)
-library(wql)
+library(tidyr)
+library(stringr)
 require(LTMRdata)
+library(readxl)
 
 Depth<-data$Depth%>%
   select(SampleRowID,Depth)%>%
@@ -237,4 +239,8 @@ Suisun_measured_lengths <- Catch2%>%
   dplyr::select(SampleID, Taxa, Dead, Length=StandardLength, Count)
 
 capabilities()
+
+report<- generateComparisonReport(Suisun, LTMRdata::Suisun%>%mutate(Date=as.POSIXct(Date)),
+                                  idCols = c("SampleID", "Taxa", "Length", "Count"))
+
 usethis::use_data(Suisun, Suisun_measured_lengths, overwrite=TRUE,compress="bzip2")
