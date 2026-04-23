@@ -11,6 +11,7 @@ library(rvest)
 
 # downloading data because the dataset is too huge to keep on file
 options(timeout = 99999)
+source(file.path("data-raw","Data_check.R"))
 
 # Find the newest revision
 # IF you want to pull a specific version of a package, which is a number
@@ -89,34 +90,39 @@ data <- bind_rows(
                                    SpecificConductance = "d", WaterTemp = "d",
                                    Turbidity = "d", Secchi = "d",
                                    Volume = "d", SamplingDirection = "c", MarkCode="c", RaceByLength="c",
-                                   OrganismCode = "c", ForkLength = "d", Count = "d"))
-)
-
+                                   OrganismCode = "c", ForkLength = "d", Count = "d")))
+# )%>%mutate(SampleDate=as.POSIXct(SampleDate,tryFormats = "%m/%d/%Y"),
+#            SampleTime=if_else(as.numeric(sub(":.*","",SampleTime))<10,as.character(paste0("0",SampleTime)),SampleTime),
+#            SampleTime=as.POSIXct(paste0("1985-01-01 ",SampleTime),"%Y-%m-%d %H:%M:%S",tz="America/Los_Angeles")
+# )
+summary(datatest$SampleTime)
 # Check to see if there are new Taxa added to the dataset:
 USFWS_Species <- Species %>%
   select(USFWS_Code, Taxa) %>%
   dplyr::filter(!is.na(USFWS_Code))
 
-New_Species <- data %>%
+New_Species <- data%>%
+  mutate(SampleDate=as.POSIXct(SampleDate,tryFormats = "%m/%d/%Y"))%>%
   group_by(OrganismCode) %>%
   slice(1) %>%
   transmute(Year = year(SampleDate),
-            OrganismCode) %>%
+            OrganismCode=as.character(OrganismCode)) %>%
   full_join(USFWS_Species,
             by = c("OrganismCode" = "USFWS_Code")) %>%
   filter(is.na(Taxa), OrganismCode != "NOFISH")
 
 if (nrow(New_Species) > 0) stop("New species entry, update the Species_Code.csv")
 
-DJFMP<-data%>%
+DJFMP<-data%>%ungroup()%>%
   dplyr::rename(Station = StationCode, Date = SampleDate, Time = SampleTime, Temp_surf = WaterTemp,
          TurbidityNTU = Turbidity, Method = MethodCode, Tow_volume = Volume, Depth=SeineDepth,
-         Tow_direction = SamplingDirection, Length = ForkLength,Conductivity=SpecificConductance) %>%
+         Tow_direction = SamplingDirection, Length = ForkLength,Conductivity=SpecificConductance)%>%
   dplyr::filter(is.na(GearConditionCode) | !GearConditionCode%in%c(3,4,9))%>%
-  mutate(Tow_volume = if_else(FlowDebris=="Y", NA_real_, Tow_volume, missing=Tow_volume),
+  dplyr::mutate(Tow_volume = if_else(FlowDebris=="Y", NA_real_, Tow_volume, missing=Tow_volume),
          Secchi = Secchi*100, # convert Secchi to cm
          Source = "DJFMP",
-         Date = parse_date_time(Date, "%Y-%m-%d", tz = "America/Los_Angeles"),
+         Date = as.POSIXct(Date,tryFormats = "%m/%d/%Y"),
+         Time=if_else(as.numeric(sub(":.*","",Time))<10,as.character(paste0("0",Time)),Time),
          Time = parse_date_time(Time, "%H:%M:%S", tz = "America/Los_Angeles"),
          # Setting midnight Times to 0 per conversation with Jonathan Speegle
          Datetime = parse_date_time(ifelse(is.na(Time) | (hour(Time)==0 & minute(Time)==0 & second(Time)==0),
@@ -130,10 +136,11 @@ DJFMP<-data%>%
          SampleID=paste(if_else(is.na(Datetime), Date, Datetime), Station, TowNumber, Method), ############################## Some datetimes and tow numbers are showing as NA, resulting in duplicate sampleIDs
          MarkCode=ifelse(OrganismCode=="NOFISH", "None", MarkCode),
          # Set up code for sub-groups to apply plus counts. Untagged Chinook Salmon are grouped by RaceByLength and any tagged fish are not incorporated into the process
-         Group=case_when(MarkCode=="None" & OrganismCode=="CHN" ~ RaceByLength,
-                         MarkCode!="None" ~ paste("Tag", 1:nrow(.)),
-                         TRUE ~ NA_character_))%>%
-  select(-Time, -MarkCode, -RaceByLength, -GearConditionCode, -FlowDebris) %>%
+         Group=case_when(MarkCode=="None"&OrganismCode=="CHN"~RaceByLength,
+                         MarkCode!="None"~ paste("Tag",1:nrow(.)),
+                         is.na(MarkCode)==T~NA_character_)
+)%>%
+#select(-Time, -MarkCode, -RaceByLength, -GearConditionCode, -FlowDebris) %>%
   group_by(across(-Count))%>% # Some species are recorded with the same length multiple times
   summarise(Count=sum(Count), .groups="drop")%>%
   group_by(SampleID, OrganismCode, Group)%>%
@@ -166,6 +173,9 @@ DJFMP<-data%>%
          Taxa = ifelse(Length_NA_flag == "No fish caught" & !is.na(Length_NA_flag), NA, Taxa))%>%
   select(Source, Station, Latitude, Longitude, Date, Datetime, Depth, SampleID, Method, Sal_surf,
          Temp_surf, TurbidityNTU, Secchi, Tow_volume, Tow_direction, Taxa, Length, Count, Length_NA_flag)
+
+report<- generateComparisonReport(DJFMP, LTMRdata::DJFMP,
+                                  idCols = c("SampleID", "Taxa", "Length", "Count"))
 
 # Save compressed data to /data
 usethis::use_data(DJFMP, overwrite=TRUE, compress="xz")

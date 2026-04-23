@@ -8,6 +8,7 @@ require(lubridate)
 require(readxl)
 require(LTMRdata)
 require(stringr)
+require(sp)
 library(rvest)
 
 # Station locations -------------------------------------------------------
@@ -50,10 +51,10 @@ db_path <- file.path(tempdir(), accessFile)
 
 keepTables <- c("TideCodes_LookUp","WaveCodes_LookUp","CloudCover_LookUp",
                 "SalinTemp","BoatStation","BoatTow",
-                "Fish Catch Data","Fish Length Data")
+                "FishCatchData","FishLengthData","StationConstants_Lookup")
 
 BayStudyTables <- bridgeAccess(db_path,
-                     tables = keepTables,
+                     tables=keepTables,
                      script = file.path("data-raw", "connectAccess.R"))
 
 
@@ -145,6 +146,10 @@ boatstation_baystudy <- boatstation_baystudy %>%
   dplyr::select(-CloudCover)%>%
   rename(CloudCover=Description)
 
+stations_baystudy<-read_excel(file.path("data-raw","Baystudy","Bay Study_Station Coordinates for Distribution_04May2020.xlsx"))%>%
+  mutate(Latitude=as.numeric(sub("°.*","",Latitude))+as.numeric(sub(".*°","",Latitude))/60,
+         Longitude=as.numeric(sub("°.*","",Longitude))-as.numeric(sub(".*°","",Longitude))/60)
+
 
 # Tow-level data -----
 boattow_baystudy <- BayStudyTables$BoatTow %>%
@@ -178,7 +183,7 @@ env_baystudy <- left_join(boattow_baystudy, boatstation_baystudy, by=c("Year", "
   mutate(Tide=if_else(is.na(Tidetow), Tidestation, Tidetow), # Tide was sometimes recorded at each station visit and sometimes at each tow
          Datetime=parse_date_time(if_else(is.na(Time), NA_character_, paste0(Date, " ", hour(Time), ":", minute(Time))), "%Y-%m-%d %%H:%M", tz="America/Los_Angeles"),
          SampleID=1:nrow(.))%>% # Create identifier for each sample (tow)
-  left_join(stations_baystudy, by="Station")%>% # Add station locations
+  left_join(stations_baystudy%>%select(Station,Latitude,Longitude), by="Station")%>% # Add station locations
   left_join(salintemp_baystudy, by=c("Year", "Survey", "Station"))%>% #Add salinity and temperature data
   dplyr::select(-Tidestation, -Tidetow, -Time) # Remove unneeded variables
 
@@ -186,8 +191,8 @@ rm(tidecodes_baystudy, wavecodes_baystudy, cloudcovercodes_baystudy, boattow_bay
 
 
 # Catch data --------------------------------------------------------------
-catch_baystudy <- BayStudyTables$`Fish Catch Data` %>%
-  transmute(Year = as.integer(Year), Survey = as.integer(Survey),
+catch_baystudy <- BayStudyTables$`FishCatchData` %>%
+  dplyr::transmute(Year = as.integer(Year), Survey = as.integer(Survey),
             Station = as.character(Station), Net = as.integer(Net),
             AlphaCode = as.character(AlphaCode), SizeGroup = as.integer(SizeGroup),
             across(c(QtsCaught, QtsSubsampled, PlusCount), as.double))
@@ -203,7 +208,7 @@ catch_baystudy <- catch_baystudy %>%
   dplyr::select(-AlphaCode) # Remove unneeded variable
 
 # Length data -------------------------------------------------------------
-length_baystudy <- BayStudyTables$`Fish Length Data` %>%
+length_baystudy <- BayStudyTables$`FishLengthData` %>%
   transmute(Year = as.integer(Year), Survey = as.integer(Survey),
             Station = as.character(Station), Net = as.integer(Net),
             AlphaCode = as.character(AlphaCode), SizeGroup = as.integer(SizeGroup),
@@ -270,6 +275,9 @@ Baystudy_measured_lengths<-length_baystudy%>%
 
 Baystudy <- Baystudy%>%
   dplyr::select(-Year)# Remove unneeded variables
+
+report<- generateComparisonReport(Baystudy, LTMRdata::Baystudy,
+                                  idCols = c("SampleID", "Taxa", "Length", "Count"))
 
 usethis::use_data(Baystudy, Baystudy_measured_lengths, overwrite = TRUE, compress="xz") # Save compressed data to /data folder
 

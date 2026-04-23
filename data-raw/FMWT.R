@@ -168,5 +168,7 @@ FMWT<-FMWT%>%
   select(-CatchRowID)%>% # Remove unneeded variable
   group_by(across(-Count))%>% # Add up any new multiples after removing lifestages
   summarise(Count=sum(Count), .groups="drop")
+report<- generateComparisonReport(FMWT, LTMRdata::FMWT%>%mutate(Date=as.POSIXct(Date)),
+                                  idCols = c("SampleID", "Taxa", "Length", "Count"))
 
-usethis::use_data(FMWT, FMWT_measured_lengths, overwrite=TRUE, compress="xz") # Save compressed data to /data
+usethis::use_data(FMWT, FMWT_measured_lengths, overwrite=TRUE,compress="bzip2")

@@ -1,9 +1,9 @@
-library(wql)
-library(readr)
-library(dplyr)
-library(lubridate)
-library(tidyr)
-library(stringr)
+require(wql)
+require(readr)
+require(dplyr)
+require(lubridate)
+require(tidyr)
+require(stringr)
 require(LTMRdata)
 
 # Setting up path for SLS files----
@@ -11,13 +11,17 @@ Path<-file.path(tempdir(), "SLS.zip")
 Path_origin<-file.path(tempdir())
 #Downloading MWT_data.zip----
 download.file("https://filelib.wildlife.ca.gov/Public/Delta%20Smelt/SLS.zip", Path, mode="wb",method="libcurl")
-unzip(Path,files="SLS.mdb",exdir=Path_origin)
+unzip(Path,files="SLS.accdb",exdir=Path_origin)
 
 # MS access database set up----
 # File path to Access database (Salvage)
-db_path <- file.path(tempdir(),"SLS.mdb")
+db_path <- file.path(tempdir(),"SLS.accdb")
 
 source(file.path("data-raw", "bridgeAccess.R"))
+source(file.path("data-raw", "Species.R"))
+officeBit="x32"
+rBit="x32"
+source(file.path("data-raw", "Data_check.R"))
 
 keepTables <- c("Catch","FishCodes","Lengths",
                 "Tow Info","Water Info","Meter Corrections", "SLS Stations")
@@ -221,5 +225,6 @@ SLS <- waterInfo %>%
 
 # Some differences in Notes_tow if you use bridgeAccess vs reading from the csv files; seems to be
 # a unicode issue with the apostrophe symbol. Comments read the same, i.e., disregard error for this difference.
-
+report<- generateComparisonReport(SLS, LTMRdata::SLS,
+                                  idCols = c("SampleID", "Taxa", "Length", "Count"))
 usethis::use_data(SLS, overwrite=TRUE, compress="xz")

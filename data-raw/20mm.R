@@ -102,8 +102,8 @@ FishSample <- data$FishSample %>%
 FishLength <- data$FishLength %>%
   mutate(across(c(FishLengthID, FishSampleID), as.integer),
          Length = as.numeric(Length),
-         across(c(AdFinPresent, ReleasedAlive), as.logical),
-         across(c(FieldRace, FinalRace), as.character))
+         across(c(AdFinPresent, ReleasedAlive), as.logical)
+         )
 
 MeterCorrections_avg <- MeterCorrections %>%
 	dplyr::group_by(MeterSerial) %>%
@@ -146,7 +146,6 @@ sample20mm <- Survey %>%
 								TowNum, Depth, SampleID, Method, Tide, Sal_surf, Temp_surf,
 								Secchi, Tow_volume, Tow_direction, Cable_length,
 								Duration, FNU, NTU, Comments, Comments.x, Comments.y)
-
 
 ## Note:
 ## GearID 33397 has two entries for fish code 10 in FishSample
@@ -240,6 +239,9 @@ TMM <- TMM %>%
 	dplyr::select(-GearID, -Duration, -Comments, -Comments.x,
 								-Comments.y, -FishCode, -Catch, -CatchNew,
 								-LengthFrequency, -TowNum)
+
+report<- generateComparisonReport(TMM, LTMRdata::TMM,
+                                  idCols = c("SampleID", "Taxa", "Length", "Count"))
 
 ## Save compressed data to /data:
 usethis::use_data(TMM, TMM_measured_lengths, overwrite=TRUE, compress="xz")
