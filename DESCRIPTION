@@ -1,6 +1,6 @@
 Package: LTMRdata
 Title: Data for the IEP Long Term Monitoring Survey Review
-Version: 2.0.0.9001
+Version: 2.1.0
 Date: 2020-07-07
 Authors@R: 
     person(given = "Sam",
@@ -18,6 +18,9 @@ Depends:
 URL: https://github.com/sbashevkin/LTMRdata
 BugReports: https://github.com/sbashevkin/LTMRdata/issues
 Suggests: 
+    archive,
+    dbplyr, 
+    odbc,
     ps,
     readr,
     lubridate,
@@ -28,8 +31,8 @@ Suggests:
     stringr,
     tibble,
     spelling,
-    deltafish (>= 0.1.0)
-RoxygenNote: 7.2.3
+    deltafish (>= 1.0.0)
+RoxygenNote: 7.3.2
 Imports: 
     dplyr,
     tidyselect,

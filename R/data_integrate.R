@@ -4,12 +4,12 @@
 #'
 #' @param data_path Path to the folder where you wish the csv/rda files to be saved.
 #' @param sources Character vector of data sources to include
-#' @param rda Logical. Should the fish and survey tables also be saved as a combined .rda file?
+#' @param format Should the fish and survey tables be saved as a csv alone, a combined .rda file, or both? Defaults to 'rda' and other options are 'csv' or 'both'.
 #' @param write Logical. Should the files be written to disk, or would you just like them returned as an R object? Defaults to TRUE.
 #' @param quiet Logical. Set to TRUE if you wish to hide all status messages.
 #' @importFrom magrittr %>%
 #' @importFrom rlang .data
-#' @return Invisbly returns a list with the survey and fish tables.
+#' @return Invisibly returns a list with the survey and fish tables.
 #'
 #' @examples
 #' \dontrun{
@@ -19,10 +19,12 @@
 
 data_integrate<-function(data_path,
                          sources = c("Baystudy", "Suisun", "FMWT", "SKT", "DJFMP", "EDSM", "TMM", "SLS", "STN", "Salvage"),
-                         rda=TRUE,
+                         format='rda',
                          write=TRUE,
                          quiet=FALSE){
-
+  if(!format%in%c("rda", "csv", "both")){
+    stop("format must be one of 'rda', 'csv', or 'both'")
+  }
   survey_cols <- c("Source",
                    "Station",
                    "Latitude",
@@ -37,6 +39,8 @@ data_integrate<-function(data_path,
                    "Sal_surf",
                    "Sal_bot",
                    "Temp_surf",
+                   "TurbidityNTU",
+                   "TurbidityFNU",
                    "Secchi",
                    "Secchi_estimated",
                    "Tow_duration",
@@ -47,8 +51,8 @@ data_integrate<-function(data_path,
                    "Notes_tow",
                    "Notes_flowmeter")
 
-  fish_cols <- c("SampleID",
-                 "Source",
+  fish_cols <- c("Source",
+                 "SampleID",
                  "Taxa",
                  "Length",
                  "Count",
@@ -90,25 +94,40 @@ data_integrate<-function(data_path,
     dplyr::group_by(.data$Source) %>%
     tidyr::complete(.data$SampleID, .data$Taxa, fill=list(Count=0))%>%
     dplyr::ungroup()%>%
+    dplyr::relocate(tidyselect::any_of(fish_cols))%>%
     dplyr::select(-"Source")
 
 
   res_fish <- res_fish %>%
-    dplyr::filter(!is.na(.data$Taxa))
+    dplyr::filter(!is.na(.data$Taxa))%>%
+    dplyr::filter(!(.data$Taxa=="UnID" & .data$Count==0))
 
   if(!quiet){
     cat("\n\nFish table finished")
-    cat("\n\nWriting csvs...")
   }
   if(write){
+    if(!quiet){cat("\n\nWriting length conversions csv...")}
     utils::write.csv(LTMRdata::Length_conversions, file.path(data_path, "Length_conversions.csv"), row.names = F)
 
-    if(rda){
+    if(format=="rda"){
       if(!quiet){cat("\n\nWriting rda...")}
       save(res_survey, res_fish, file=file.path(data_path, "fishsurvey_compressed.rda"), compress = "xz")
     }else{
-      utils::write.csv(res_survey, file.path(data_path, "survey.csv"), row.names = F)
-      utils::write.csv(res_fish, file.path(data_path, "fish.csv"), row.names = F)
+      if(format=="both"){
+        if(!quiet){cat("\n\nWriting rda...")}
+        save(res_survey, res_fish, file=file.path(data_path, "fishsurvey_compressed.rda"), compress = "xz")
+        res_survey$Datetime<-format(res_survey$Datetime, format="%Y-%m-%d %H:%M:%S", tz="America/Los_Angeles")
+        if(!quiet){cat("\n\nWriting survey csv...")}
+        utils::write.csv(res_survey, file.path(data_path, "survey.csv"), row.names = F)
+        if(!quiet){cat("\n\nWriting fish csv...")}
+        utils::write.csv(res_fish, file.path(data_path, "fish.csv"), row.names = F)
+      }else{
+        res_survey$Datetime<-format(res_survey$Datetime, format="%Y-%m-%d %H:%M:%S", tz="America/Los_Angeles")
+        if(!quiet){cat("\n\nWriting survey csv...")}
+        utils::write.csv(res_survey, file.path(data_path, "survey.csv"), row.names = F)
+        if(!quiet){cat("\n\nWriting fish csv...")}
+        utils::write.csv(res_fish, file.path(data_path, "fish.csv"), row.names = F)
+      }
     }
   }
 

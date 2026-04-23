@@ -1,7 +1,15 @@
 require(dplyr)
 require(LTMRdata)
-data_dir<-tempdir()
-# data_dir<-file.path("data-raw", "EDI", "data_objects")
+
+integrate<-TRUE
+
+if(integrate){
+  data_dir<-tempdir()
+
+}else{
+  data_dir<-file.path("publication", "data_objects")
+}
+
 cache_dir<-"LTMRdata-test"
 
 # First collect some stats on the raw mashed together data
@@ -10,9 +18,9 @@ data_raw<-bind_rows(LTMRdata::Baystudy, LTMRdata::Suisun, LTMRdata::FMWT, LTMRda
   group_by(Source)%>%
   summarise(N=n(),
             N_0=length(which(Count==0)),
-            N_lengths=length(which(Length>0)),
+            N_lengths=length(which(Length>0 & !is.na(Taxa))),
             Samples=list(unique(SampleID)),
-            Fish=list(sort(unique(Taxa))),
+            Fish=list(sort(unique(Taxa[which(Taxa!="UnID")]))),
             .groups="drop")%>%
   arrange(Source)
 
@@ -20,76 +28,56 @@ raw_samples<-unique(unlist(data_raw$Samples))
 
 gc()
 
-data_integrate(data_dir)
+if(integrate){
+  data_integrate(data_dir)
+  gc()
+}
 
-gc()
-deltafish:::create_fish_db_f(data_dir=data_dir, cache_dir, edi_pid="edi.1075.1", update=T)
-gc()
+deltafish:::create_fish_db_f(data_dir=data_dir, cache_dir, edi_pid="edi.1075.2", update=T)
 
-fish<-deltafish:::open_fish_f(cache_dir)
-surv<-deltafish:::open_survey_f(cache_dir)
+con <- deltafish:::open_database_f(cache_dir)
 
-data_integrated_surveys<-surv%>%
-  left_join(fish, by="SampleID")%>%
+fish<-deltafish::open_fish(con)%>%
+  select(SampleID, Length, Count, Taxa, Notes_catch)
+
+surv<-deltafish::open_survey(con)%>%
+  select(SampleID, Source)
+
+data_integrated_surveys<-fish%>%
+  left_join(surv, by="SampleID")%>%
   group_by(Source)%>%
   summarise(N=n(),
             N_0=sum(as.integer(Count==0), na.rm = TRUE),
             N_lengths=sum(as.integer(Length>0), na.rm = TRUE),
             N_length_NA=sum(as.integer(is.na(Length)), na.rm=TRUE),
             .groups="drop")%>%
-  arrange(Source)%>%
-  collect()
-
-gc()
-
-integrated_samples<-select(surv, SampleID)%>%
   collect()%>%
-  unlist()%>%
-  unique()
+  arrange(Source)
 
-gc()
+integrated_samples<-pull(surv, SampleID)%>%
+  unique()
 
 integrated_fishlength<-fish%>%
   mutate(ID=paste(SampleID, Length, Count, Taxa, Notes_catch))%>%
-  select(ID)%>%
-  collect()%>%
-  unlist()%>%
-  unique()
-
-gc()
+  pull(ID)
 
 integrated_fish_rows<-fish%>%
   summarise(N=n())%>%
-  collect()%>%
-  unlist()
-
-names(integrated_fish_rows)<-NULL
-
-gc()
+  pull(N)
 
 integrated_surv_rows<-surv%>%
   summarise(N=n())%>%
-  collect()%>%
-  unlist()
+  pull(N)
 
-names(integrated_surv_rows)<-NULL
-
-gc()
-
-data_integrated_samples<-surv%>%
-  distinct(SampleID, Source)%>%
-  compute()%>%
-  left_join(fish%>%
-              distinct(SampleID, Taxa)%>%
-              compute(),
-            by="SampleID")%>%
+data_integrated_samples<-fish%>%
+  filter(Taxa!="UnID")%>%
+  left_join(surv, by="SampleID")%>%
+  distinct(SampleID, Source, Taxa)%>%
   collect()%>%
   group_by(Source, SampleID)%>%
   summarise(Fish=list(sort(unique(Taxa))), .groups="drop")%>%
   distinct(Source, Fish)%>%
   arrange(Source)
-
-gc()
 
 test_that("zero_fill output has more rows and 0 counts than input data", {
   expect_true(all(data_integrated_surveys$N>data_raw$N))
@@ -126,6 +114,6 @@ test_that("Some (but not all) lengths are NA ", {
 })
 
 # Remove the cache at the end
-rm(fish, surv)
+deltafish::close_database(con)
 gc()
 deltafish:::clear_cache_f(cache_dir)

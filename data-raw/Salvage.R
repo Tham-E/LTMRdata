@@ -60,7 +60,13 @@ rowsToRemove <- SalvageJoined %>%
   distinct(SampleRowID, OrganismCode) %>%
   group_by(SampleRowID) %>%
   add_tally(name = "nTotalCount") %>%
-  filter(OrganismCode %in% c(98, 99) & nTotalCount != 1) %>%
+  filter((OrganismCode %in% c(98, 99) & nTotalCount != 1) |
+           # Removing OrganismCode == 81, Chinese Mitten Crab Temp
+           # These were collected using a different sampling methods than
+           # Salvage at the CVP facility mainly in 1999. Although the number of
+           # crabs is significant, these catches are not comparable to regular
+           # salvage and is being removed.
+           OrganismCode == 81) %>%
   pull(SampleRowID)
 
 # Fixes to the dataset to pass package tests
@@ -104,9 +110,20 @@ SalvageStart <- SalvageJoined %>%
             Longitude = case_when(Comments_StationsLookUp == "SWP" ~ -121.59584120116043,
                                   Comments_StationsLookUp == "CVP" ~ -121.55857777929133),
             Date = parse_date_time(SampleDate, "%Y-%m-%d", tz="America/Los_Angeles"),
-            Datetime = as.POSIXct(paste0(Date, " ", SampleTime),
-                                  format = "%Y-%m-%d %H:%M:%S",
-                                  tz = "America/Los_Angeles"),
+            # Will produce a warning about failed parses. Due to daylight saving times;
+            # There are entries in which the observer did not properly jump times entering
+            # in entries that cannot exist, e.g., 2 AM when jumping forward since that is
+            # automatically 3 AM.
+            # 638 failed parses as of 07-01-24
+            Datetime = parse_date_time(paste0(Date, " ", SampleTime),
+                                       orders = "%Y-%m-%d %H:%M:%S",
+                                       tz = "America/Los_Angeles"),
+            # Fix nonexistent daylight savings times by setting them to 3AM
+            Datetime = if_else(is.na(Datetime) & SampleTime=="02:00:00.0000000",
+                               parse_date_time(paste0(Date, " 03:00:00"),
+                                               orders = "%Y-%m-%d %H:%M:%S",
+                                               tz = "America/Los_Angeles"),
+                               Datetime),
             SampleRowID,
             # Here, 0000 = normal count, 9999 = second flush, 7777 = traveling screen count, and 8888 = special study
             Method = Description,
@@ -115,6 +132,7 @@ SalvageStart <- SalvageJoined %>%
             Tow_volume = AcreFeet * 1233.48,
             # MinutesPumping, SampleTimeLength,
             Temp_surf = (WaterTemperature - 32) * 5/9, # Is this really surface temperature? It's well mixed
+            Temp_surf = if_else(Temp_surf<0, NA_real_, Temp_surf), # Salvage seems to use 0F to indicate broken temp gage. This turns into negative values in C.
             # PrimaryDepth, PrimaryFlow, BayPump1, BayPump2, BayPump3, BayPump4,
             # BayPump5, Sampler, QCed,
             # BuildingCode,
@@ -206,7 +224,65 @@ Salvage <- SalvageStart %>%
 # Final check
 if (nrow(SalvageStart) - nrow(Salvage) != 6) stop("The last distinct() step removed more rows than intended. Check.")
 
-# Final check
+# When are periods of no sampling? May occur when:
+# Pumping minutes is NA or 0
+# Count is NA or 0
+# Tow volume is NA or 0
+# Taxa is NA
+noSamplingMaybe <- Salvage %>%
+  filter((is.na(Count) | Count == 0) |
+           (is.na(Tow_volume | Tow_volume == 0)) |
+           is.na(Taxa))
+# Unique string of all the potential comments used here
+
+# Now, removing periods where there was no fish sampling; this is because
+# water quality sampling may still occur with no fish sampling--we don't want those in this dataset
+# These values appears to be comprehensive for now. Tested to see if they yield correct results.
+
+noSamplingRegex <- c(
+  "no\\s*(count|cnt|fish\\s*(count|cnt|salvage))",
+  "(shut\\s*down|shutdown|facilityshutdown)",
+  "down\\s*for\\s*(maintenance|repairs)",
+  "no\\s*(pumping|water|flow|salvage|export|TFF.*salvage)",
+  "(zero|0)\\s*(count|slvg|export|flow|pumping|salvage|units|bapp)",
+  # "facility\\s*(shut\\s*down|shutdown)",
+  "(power\\s*outage|equipment\\s*failure)",
+  # "trash\\s*rack\\s*failure",
+  # "hoist\\s*(down|failure)",
+  # "screen\\s*failure",
+  # "vamp",
+  # "no\\s*data",
+  "stopped\\s*pumping\\s*water",
+  # "(bjpp|jpp)\\s*shutdown",
+  # "no\\s*tracy\\s*pumps",
+  # "pump\\s*not\\s*working",
+  "no\\s+(fish\\s+|10\\s+(min(ute)?\\.?\\s+)?)?(count)"
+  # "^0+\\s*cfs"
+) # 1072
+# Not all of these are required; I've commented out the redundant ones
+# Not deleting them though in case they are useful in the future
+
+# This is a conservative filter as it also requires Count == 0
+Salvage <- Salvage %>%
+  mutate(
+    noSampling = grepl(paste(noSamplingRegex, collapse = "|"), Notes_tow, ignore.case = T)
+    # noSamplingTime = grepl("[0-9]{2,4}([:][0-9]{2})?([ ]?(HRS))?", Notes_tow, ignore.case = T) & noSampling,
+    # didNotShutDown = grepl("did not shut down", Notes_tow, ignore.case = T) & noSampling
+  ) %>%
+  # This removes 1072 records as of 7-18-2024
+  filter(!(noSampling & Count == 0 & Method == "Normal count"),
+         # Remove Sampling from the CVP between 2021-06-11 to 2021-06-16. No pumping at this facility
+         # No comments written for these entries though. Confirmed via datasheet provided by
+         # Kyle Griffiths on 2024-07-16. This should be only 66 rows for this specific filter
+         !(between(Date, as.Date("2021-06-11"), as.Date("2021-06-16")) &
+             Station == "CVP Federal Facility" & Tow_volume == 0 & Count == 0),
+         # This singular row too specific to match with regex without false matches
+         !SampleID %in% "Salvage 219623 1",
+         # Kyle Griffiths confirmed that on these dates, the SWP was not sampling
+         !(Date %in% as.POSIXct(c("2022-05-17", "2022-05-18", "2022-05-19", "2022-06-07",
+                     "2022-06-29", "2022-06-30", "2022-07-01")) &
+            Station == "SWP NA")) %>%
+  select(-noSampling)
 
 # # This is the expansion of this dataset, checked against the CDFW website
 # SalvageFinal <- Salvage %>%

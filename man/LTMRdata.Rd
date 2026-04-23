@@ -2,26 +2,21 @@
 % Please edit documentation in R/LTMRdata.R
 \docType{package}
 \name{LTMRdata}
+\alias{LTMRdata-package}
 \alias{LTMRdata}
 \title{LTMRdata: A package for integrating long-term monitoring datasets for the IEP long-term monitoring program review.}
 \description{
-This package contains internal datasets and a function to bind them all together.
+This package contains internal datasets and a function (\code{\link{data_integrate}}) to bind them all together.
 }
-\section{Data}{
-
+\seealso{
+Useful links:
 \itemize{
-  \item \code{\link{Suisun}}
-  \item \code{\link{FMWT}}
-  \item \code{\link{Baystudy}}
-  \item \code{\link{TMM}}
-  \item \code{\link{Species}}
-}
+  \item \url{https://github.com/sbashevkin/LTMRdata}
+  \item Report bugs at \url{https://github.com/sbashevkin/LTMRdata/issues}
 }
 
-\section{Functions}{
-
-\itemize{
-  \item \code{\link{LTMRpilot}}
-  }
 }
+\author{
+\strong{Maintainer}: Sam Bashevkin \email{sam.bashevkin@waterboards.ca.gov} (\href{https://orcid.org/0000-0001-7406-7089}{ORCID})
 
+}

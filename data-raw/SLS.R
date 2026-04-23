@@ -6,24 +6,21 @@ library(tidyr)
 library(stringr)
 require(LTMRdata)
 
-
 # Setting up path for SLS files----
 Path<-file.path(tempdir(), "SLS.zip")
 Path_origin<-file.path(tempdir())
 #Downloading MWT_data.zip----
 download.file("https://filelib.wildlife.ca.gov/Public/Delta%20Smelt/SLS.zip", Path, mode="wb",method="libcurl")
-unzip(Path,files="SLS.accdb",exdir=Path_origin)
+unzip(Path,files="SLS.mdb",exdir=Path_origin)
 
 # MS access database set up----
 # File path to Access database (Salvage)
-db_path <- file.path(tempdir(),"SLS.accdb")
-rBit="x32"
-officeBit="x32"
+db_path <- file.path(tempdir(),"SLS.mdb")
+
 source(file.path("data-raw", "bridgeAccess.R"))
 
-keepTables <- c("SLS Stations","Catch","FishCodes","Lengths",
-                "Tow Info","Water Info","Meter Corrections"#,"Wt_factors", "AreaCode1"
-                )
+keepTables <- c("Catch","FishCodes","Lengths",
+                "Tow Info","Water Info","Meter Corrections", "SLS Stations")
 
 SLSTables <- bridgeAccess(db_path,
                             tables = keepTables,
@@ -61,7 +58,7 @@ SLSTables <- bridgeAccess(db_path,
 #
 # SLSTables$`Water Info` <- read_csv(file.path("data-raw", "SLS", "Water Info.csv"),
 #                                    col_types =
-#                                      cols_only(Survey = "i", Date = "c", Station = "c", Temp = "d",
+#                                      cols_only(Survey = "i", Date = "c", Station = "c", TopTemp = "d",
 #                                                TopEC = "i", BottomEC = "i", Secchi = "i", Turbidity = "i",
 #                                                Comments = "c")) %>%
 #   mutate(Date = parse_date_time(Date, "%Y-%m-%d", tz="America/Los_Angeles"))
@@ -98,12 +95,10 @@ SLSTables$`Tow Info` <- SLSTables$`Tow Info`%>%
             Tow = as.integer(Tow),
             Time = as.POSIXct(Time),
             Tide = as.character(Tide),
-            across(c(BottomDepth),as.integer),
+            BottomDepth = as.integer(BottomDepth),
             CableOut = CableOut * 0.3048,
             Duration = as.double(Duration),
-            across(c(NetMeterSerial, NetMeterStart, NetMeterEnd, NetMeterCheck
-                     #CBMeterSerial, CBMeterStart, CBMeterEnd, CBMeterCheck
-                     ),
+            across(c(NetMeterSerial, NetMeterStart, NetMeterEnd, NetMeterCheck),
                    as.integer),
             Notes_tow = as.character(Comments))
 
@@ -111,17 +106,15 @@ SLSTables$`Water Info` <- SLSTables$`Water Info`%>%
   transmute(Survey = as.integer(Survey),
             Date = parse_date_time(Date, "%Y-%m-%d", tz="America/Los_Angeles"),
             Station = as.character(Station),
-            Temp = as.double(TopTemp),
-            across(c(TopEC, BottomEC, Secchi, FNU,NTU), as.integer),
+            TopTemp = as.double(TopTemp),
+            across(c(TopEC, BottomEC, Secchi, NTU, FNU), as.integer),
             Notes_env = as.character(Comments))
 
+# SLS used to have a 20 mm station table that has changed to be "SLS Stations"
 SLSTables$`SLS Stations` <- SLSTables$`SLS Stations` %>%
-  mutate(Station = as.character(Station),
-         across(c(LatD, LatM, LatS, LonD, LonM, LonS), as.double),
-         Latitude = (LatD + LatM/60 + LatS/3600),
-         Longitude = -(LonD + LonM/60 + LonS/3600)) %>%
-  dplyr::select(Station,Latitude,Longitude) %>%
-  na.omit()
+  transmute(Station = as.character(Station),
+            Latitude = (LatD + LatM/60 + LatS/3600),
+            Longitude = -(LonD + LonM/60 + LonS/3600))
 
 # Manipulating the data tables --------------------------------------------
 
@@ -129,11 +122,11 @@ waterInfo <- SLSTables$`Water Info` %>%
   mutate(# Converting secchi from cm to m
     Secchi = Secchi/100,
     # Converting EC to salinity
-    # Per SOP normalized at temp = 25C; units are in millisiemens
+    # Per SOP normalized at TopTemp = 25C; units are in millisiemens
     Sal_surf = wql::ec2pss(TopEC/1000, t = 25),
     Sal_bot = wql::ec2pss(BottomEC/1000, t = 25),
     # This is to take care of how the floats are read between Access and readr methods...
-    Temp_surf = round(Temp, 2),
+    Temp_surf = round(TopTemp, 2),
     # Changing Date to as.Date
     Date = parse_date_time(Date, "%Y-%m-%d", tz="America/Los_Angeles"))
 
@@ -188,17 +181,17 @@ SLS <- waterInfo %>%
   full_join(catch,
             by = c("Date", "Station", "Tow"),multiple="all") %>%
   full_join(lengths,
-            by = c("Date", "Station", "Tow", "FishCode"),multiple="all")%>%
+            by = c("Date", "Station", "Tow", "FishCode"),multiple="all") %>%
   # Adding in taxa name based on Species Code.csv file
   left_join(Species %>%
-              select(TMM_Code,
+              select(SLS_Code,
                      Taxa) %>%
-              dplyr::filter(!is.na(TMM_Code)),
-            by = c("FishCode"="TMM_Code"))%>%
-  left_join(SLSTables$"SLS Stations",
+              dplyr::filter(!is.na(SLS_Code)),
+            by = c("FishCode"="SLS_Code")) %>%
+  left_join(SLSTables$`SLS Stations`,
             by="Station")%>%
   # Merging the two comment columns together; they both have data in them
-  mutate(Notes_tow=paste(Notes_tow, Notes_env, sep = "; "))%>%
+  mutate(Notes_tow=paste(Notes_tow, Notes_env, sep = "; ")) %>%
   arrange(Date, Datetime, Survey, Station, Tow, Taxa, Length) %>%
   mutate(Source = "SLS",
          SampleID=paste(Source, Date, Station, Tow), # Creating SampleID index
@@ -214,12 +207,13 @@ SLS <- waterInfo %>%
   # Removing CatchID and entryorder as they are not relevant to the dataset
   # Removing TopEC, BottomEC as they have been converted over the salinity already
   # Removing CBMeterSerial, CBMeterStart, CBMeterEnd, CBMeterCheck as CB not ran on the SLS
-  select(Source, Station, Latitude, Longitude,
-         Date, Datetime, Survey, Depth, SampleID, Method,
-         Tide, Sal_surf, Sal_bot, Temp_surf, Secchi, NTU,FNU, Tow_volume,
-         Cable_length=CableOut, Tow_duration=Duration,
-         Taxa, Length, Count, Length_NA_flag,
-         Notes_tow, Notes_flowmeter = Notes)
+  transmute(Source, Station, Latitude, Longitude,
+            Date, Datetime, Survey, Depth, SampleID, Method,
+            Tide, Sal_surf, Sal_bot, Temp_surf, Secchi,
+            TurbidityNTU = NTU, TurbidityFNU = FNU, Tow_volume,
+            Cable_length=CableOut, Tow_duration=Duration,
+            Taxa, Length, Count, Length_NA_flag,
+            Notes_tow, Notes_flowmeter = Notes)
 
 # # Just to make sure that no duplications occurred; lengths should be the same
 # all.equal(lengths$Length %>% sum(na.rm = T),

@@ -103,7 +103,7 @@ Sample <- STNTables$Sample %>%
                      DepthBottom, CableOut, TowDirection), as.double))
 
 TowEffort <- STNTables$TowEffort %>%
-  transmute(TimeStart = as.character(TimeStart),
+  transmute(TimeStart = parse_date_time(as.character(TimeStart), "%Y-%m-%d %H:%M:%S", tz="America/Los_Angeles"),
             across(c(TowRowID, SampleRowID, TowNumber, MeterSerial,
                      MeterIn, MeterOut, MeterDifference), as.double),
             MeterEstimate = as.logical(MeterEstimate))
@@ -138,7 +138,7 @@ sampleSTN <- Sample %>%
          TowNumber=ifelse(SampleRowID==7078 & TowNumber==1 & TowRowID==12153, 2, TowNumber),
          SampleID=paste(Source, SampleDate, Survey, StationCode, TowNumber),
          Method="STN net",
-         TowTime=str_split(TimeStart, " ")[[1]][2], #Select time which always follows a space
+         TowTime=if_else(is.na(TimeStart), NA_character_, paste(hour(TimeStart), minute(TimeStart), second(TimeStart), sep=":")),
          Datetime=paste(SampleDate, TowTime),
          Datetime=parse_date_time(ifelse(is.na(TowTime), NA_character_,
                                           Datetime),
@@ -153,6 +153,7 @@ sampleSTN <- Sample %>%
          ## ConductivityTop is in micro-S/cm at 25 degrees Celsius.
          ## Input for ec2pss should be in milli-S/cm.
          Sal_surf=wql::ec2pss(ConductivityTop/1000, t=25),
+         Sal_surf=if_else(Sal_surf>40, NA_real_, Sal_surf),
          Latitude=(LatD + LatM/60 + LatS/3600),
          Longitude= -(LonD + LonM/60 + LonS/3600)) %>%
   left_join(luTide, by=c("TideCode"="TideRowID")) %>%
@@ -251,7 +252,7 @@ names(STN_measured_lengths)
 ## Create final catch data frame:
 STN <- STN %>%
   rename(Length=ForkLength) %>%
-  select(-TowRowID, -OrganismCode, -LengthFrequency, -Catch)
+  select(-TowRowID, -OrganismCode, -LengthFrequency, -Catch, -TowNum)
 
 nrow(STN)
 ncol(STN)

@@ -10,20 +10,21 @@
 library(shiny)
 library(shinyWidgets)
 library(dplyr)
-require(lubridate)
+library(lubridate)
 library(ggplot2)
 library(deltafish)
-require(readr)
+library(readr)
+library(shinybusy)
 
 create_fish_db()
 cat("finished creating fish database")
-surv<-open_survey()%>%
+con<-open_database()
+surv<-open_survey(con)%>%
   mutate(StationID=paste(Source, Station),
-         Date=as_date(Date),
          Year=as.integer(year(Date)),
          Month=as.integer(month(Date)))
 
-fish<-open_fish()
+fish<-open_fish(con)
 
 surveys<-surv%>%
   distinct(Source)%>%
@@ -56,11 +57,6 @@ suisun_samples<-surv%>%
   pull(SampleID)
 gc()
 
-#Settings for the "data crunching" message.
-info_loading <- "Crunching data"
-progress_color <- "black"
-progress_background <- "#c5c5c9"
-
 # Define UI for application that draws a histogram
 ui <- fluidPage(
 
@@ -71,6 +67,11 @@ ui <- fluidPage(
                        h5("If you encounter any issues, please email ", a("sam.bashevkin@waterboards.ca.gov.",
                                                                           href="mailto:sam.bashevkin@waterboards.ca.gov?subject=Fish%20data%20Shiny%20app"))),
              windowTitle = "Delta fish database"),
+
+  add_busy_spinner(spin = "fading-circle", position = c("top-right"),
+                   height = "400px",
+                   width = "400px",
+                   margins=c(200, 200)),
 
   # Sidebar with a slider input for number of bins
   sidebarLayout(
@@ -97,8 +98,9 @@ ui <- fluidPage(
                   step=1,
                   sep=""),
       pickerInput("Species",
-                  "Select species:",
+                  "Select species (up to 10):",
                   choices = species,
+                  selected = species[1],
                   multiple = TRUE,
                   options=list("selected-text-format" = "count > 3",
                                "live-search" = TRUE,
@@ -112,43 +114,24 @@ ui <- fluidPage(
                        h4("Fork length cutoff (mm; all other surveys)"),
                        fluidRow(column(6, numericInput("Forkmin", "Min", value = 0, min=0, max=length_max, step = 1)),
                                 column(6, numericInput("Forkmax", "Max", value = length_max, min=0, max=length_max, step = 1)))),
-      actionBttn("Run", "Run/Update", style="bordered", icon = icon("play"), color="danger", size="sm"),
-      h2("Rows:"),
-      textOutput("rows"),
-      h2("Can you safely open this in excel?"),
-      textOutput("excel"),
-      h2("Estimated CSV size:"),
-      textOutput("size"),
-      actionBttn("Download", "Download data", style="simple", color="royal", icon=icon("file-download"))
+      conditionalPanel(condition="input.Surveys.length > 0 && input.Months.length > 0 && input.Years.length > 0 && input.Species.length > 0",
+                       actionBttn("Run", "Run/Update", style="bordered", icon = icon("play"), color="danger", size="sm")),
+      conditionalPanel(condition="output.download_ready == true",
+                       h2("Rows:"),
+                       textOutput("rows"),
+                       h2("Can you safely open this in excel?"),
+                       textOutput("excel"),
+                       h2("Estimated CSV size:"),
+                       textOutput("size")),
+      conditionalPanel(condition="output.download_ready == true",
+                       actionBttn("Download", "Download data", style="simple", color="royal", icon=icon("file-download")))
     ),
 
     # Show a plot of the generated distribution
     mainPanel(
       plotOutput("dataPlot")
     )
-  ),
-  # Display the "data crunching" message.
-  tags$head(tags$style(type="text/css",
-                       paste0("
-                                             #loadmessage {
-                                             position: fixed;
-                                             top: 25%;
-                                             left: 25%;
-                                             width: 50%;
-                                             padding: 30px 0px 30px 0px;
-                                             text-align: center;
-                                             font-weight: bold;
-                                             font-size: 200%;
-                                             color: ", progress_color,";
-                                             background-color: ", progress_background,";
-                                             z-index: 105;
-                                             border: 2px solid black;
-                                             border-radius: 50px;
-                                             }
-                                             "))),
-  conditionalPanel(condition="$('html').hasClass('shiny-busy')",
-                   tags$div(tags$i(class = "fa fa-spinner", style = "color: black"), info_loading, tags$i(class = "fa fa-spinner", style = "color: black"), id="loadmessage")),
-  tags$style(type="text/css", ".recalculating {opacity: 1.0;}")
+  )
 )
 
 # Define server logic required to draw a histogram
@@ -160,7 +143,7 @@ server <- function(input, output, session) {
                    text = tags$span(tags$p("This app works best if you select a subset of the data, rather than trying to obtain the full dataset.
                                            You will not be allowed to select more than 10 fish species, since that will crash the app.
                                            If you wish to access the full dataset, you can do so at the",
-                                           a("data publication.", href="https://www.doi.org/10.6073/pasta/0cdf7e5e954be1798ab9bf4f23816e83")),
+                                           a("data publication.", href="https://doi.org/10.6073/pasta/a29a6e674b0f8797e13fbc4b08b92e5b")),
                                     tags$p("If you are an R user, you can access the database with more advanced options using the R package",
                                            a("deltafish.", href="https://delta-stewardship-council.github.io/deltafish/")),
                                     tags$p("The 'sum counts over all lengths' option allows you to decide whether to keep the data as length frequency
@@ -168,8 +151,10 @@ server <- function(input, output, session) {
                                            total number of each species captured in each trawl. If you decide to sum counts over all lengths,
                                            you are given the option to only select fish within a given size range, so you can get the total number
                                            of fish in your desired length range. This can be helpful to exclude small fish that are not always counted in the surveys."),
-                                    tags$p(tags$b("Please read the full documentation in the", a("data publication", href="https://www.doi.org/10.6073/pasta/0cdf7e5e954be1798ab9bf4f23816e83"),
-                                                  "before using these data. There are important details to take into account, such as the inconsistency in the fish length unit.")),
+                                    tags$p(tags$b("Please read the full documentation in the", a("data publication", href="https://doi.org/10.6073/pasta/a29a6e674b0f8797e13fbc4b08b92e5b"),
+                                                  "before using these data. There are important details to take into account, such as the inconsistency in the fish length unit.
+                                                  In addition, more information on the component surveys can be found on the",
+                                                  a("IEP webpage.", href="https://iep.ca.gov/Data/IEP-Survey-Data"))),
                                     "------------------------------------------",
                                     tags$p(tags$b("App created and maintained by Sam Bashevkin.
                                                   Please email", a("Sam", href="mailto:sam.bashevkin@waterboards.ca.gov?subject=Fish%20data%20Shiny%20app"), "with any questions."))),
@@ -269,6 +254,12 @@ server <- function(input, output, session) {
       nrow
   })
 
+  # Is download appropriate (i.e., are there any rows?)
+  output$download_ready<-reactive({
+    !is.null(rows()) & rows()>0
+  })
+  outputOptions(output, "download_ready", suspendWhenHidden = FALSE)
+
   # Format row number for display
   output$rows <- renderText({
     req(rows)
@@ -322,7 +313,7 @@ server <- function(input, output, session) {
   ModalDownloadData<-function(){
     modalDialog(
       h1("Data info"),
-      p("Please see the", a("data publication.", href="https://www.doi.org/10.6073/pasta/0cdf7e5e954be1798ab9bf4f23816e83"),
+      p("Please see the", a("data publication.", href="https://doi.org/10.6073/pasta/a29a6e674b0f8797e13fbc4b08b92e5b"),
         "for all metadata associated with this dataset, as well as the citation information."),
       footer = tagList(modalButton("Cancel"),
                        downloadBttn("Downloaddata", "Download data", style="bordered", color = "primary", size="sm")),

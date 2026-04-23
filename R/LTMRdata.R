@@ -1,24 +1,10 @@
 #' LTMRdata: A package for integrating long-term monitoring datasets for the IEP long-term monitoring program review.
 #'
-#' This package contains internal datasets and a function to bind them all together.
+#' This package contains internal datasets and a function (\code{\link{data_integrate}}) to bind them all together.
 #'
-#' @section Data:
-#' \itemize{
-#'   \item \code{\link{Suisun}}
-#'   \item \code{\link{FMWT}}
-#'   \item \code{\link{Baystudy}}
-#'   \item \code{\link{TMM}}
-#'   \item \code{\link{Species}}
-#' }
 #'
-#' @section Functions:
-#' \itemize{
-#'   \item \code{\link{LTMRpilot}}
-#'   }
-#'
-#' @docType package
 #' @name LTMRdata
-NULL
+"_PACKAGE"
 
 ## quiets concerns of R CMD check re: the .'s that appear in pipelines
 if(getRversion() >= "2.15.1")  utils::globalVariables(c("."))
