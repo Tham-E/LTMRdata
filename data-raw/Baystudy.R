@@ -46,14 +46,11 @@ accessFile <- unzip(file.path(tempdir(), fileName), list = T) %>%
 # File path to Access database (Salvage)
 source(file.path("data-raw", "bridgeAccess.R"))
 
-officeBit="x32"
-rBit="x32"
-
 db_path <- file.path(tempdir(), accessFile)
 
 keepTables <- c("TideCodes_LookUp","WaveCodes_LookUp","CloudCover_LookUp",
                 "SalinTemp","BoatStation","BoatTow",
-                "FishCatchData","FishLengthData")
+                "Fish Catch Data","Fish Length Data")
 
 BayStudyTables <- bridgeAccess(db_path,
                      tables = keepTables,
@@ -189,12 +186,12 @@ rm(tidecodes_baystudy, wavecodes_baystudy, cloudcovercodes_baystudy, boattow_bay
 
 
 # Catch data --------------------------------------------------------------
-catch_baystudy <- BayStudyTables$`FishCatchData` %>%
+catch_baystudy <- BayStudyTables$`Fish Catch Data` %>%
   transmute(Year = as.integer(Year), Survey = as.integer(Survey),
             Station = as.character(Station), Net = as.integer(Net),
             AlphaCode = as.character(AlphaCode), SizeGroup = as.integer(SizeGroup),
             across(c(QtsCaught, QtsSubsampled, PlusCount), as.double))
-source(file.path("data-raw","Species.R"))
+
 catch_baystudy <- catch_baystudy %>%
   rename(Method=Net)%>%
   mutate(Method=recode(Method, `1`="Midwater trawl", `2`="Otter trawl", `3`="EL"))%>% # Convert method codes to values
@@ -206,7 +203,7 @@ catch_baystudy <- catch_baystudy %>%
   dplyr::select(-AlphaCode) # Remove unneeded variable
 
 # Length data -------------------------------------------------------------
-length_baystudy <- BayStudyTables$`FishLengthData` %>%
+length_baystudy <- BayStudyTables$`Fish Length Data` %>%
   transmute(Year = as.integer(Year), Survey = as.integer(Survey),
             Station = as.character(Station), Net = as.integer(Net),
             AlphaCode = as.character(AlphaCode), SizeGroup = as.integer(SizeGroup),
@@ -274,6 +271,5 @@ Baystudy_measured_lengths<-length_baystudy%>%
 Baystudy <- Baystudy%>%
   dplyr::select(-Year)# Remove unneeded variables
 
-usethis::use_data(Baystudy, Baystudy_measured_lengths, overwrite = TRUE) # Save compressed data to /data folder
-rm(BayStudyTables,catch_baystudy,env_baystudy,length_baystudy,lengthcatch_baystudy,fileName,dbLink,accessFile,links)
+usethis::use_data(Baystudy, Baystudy_measured_lengths, overwrite = TRUE, compress="xz") # Save compressed data to /data folder
 
