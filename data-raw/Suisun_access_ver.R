@@ -9,14 +9,15 @@ download.file("https://drive.usercontent.google.com/download?id=1rHMO5Kqqz-GdoSO
 
 
 
-#unzip file
-zipFileName<-"SuisunMarshFish_2025.zip"
-localZipFile<-file.path("D:/LTMRdata/LTMRdata/data-raw/Suisun",zipFileName)
-unzip(zipfile=localZipFile,exdir=file.path(tempdir()))
+# #unzip file (Leaving in case online download does not work)
+# zipFileName<-"SuisunMarshFish_2025.zip"
+# localZipFile<-file.path("D:/LTMRdata/LTMRdata/data-raw/Suisun",zipFileName)
+# unzip(zipfile=localZipFile,exdir=file.path(tempdir()))
+# db_path<-file.path(tempdir(),"SuisunMarshFish_2025.accdb")
 #connect with access
 
 
-db_path<-file.path(tempdir(),"SuisunMarshFish_2025.accdb")
+
 keepTables <- c("AgesBySizeMo", "Catch", "Depth",
                 "Sample", "StationsLookUp", "TrawlEffort")
 officeBit="x32"
