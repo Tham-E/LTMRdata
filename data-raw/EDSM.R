@@ -151,4 +151,6 @@ EDSM <- bind_rows(
   filter(!is.na(Method))
 
 # Save compressed data to /data
-usethis::use_data(EDSM, overwrite=TRUE, compress = "xz")
+report<- generateComparisonReport(EDSM, LTMRdata::EDSM,
+                                  idCols = c("SampleID", "Taxa", "Length", "Count"))
+usethis::use_data(EDSM, overwrite=TRUE,compress="bzip2")
