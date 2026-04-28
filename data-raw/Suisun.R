@@ -200,8 +200,7 @@ Suisun1 <- Catch2%>%
               group_by(SampleID, Taxa, SizeGroup)%>%
               summarise(TotalCatch=sum(Count, na.rm=T), .groups="drop"), # Calculate total catch
             by=c("SampleID", "Taxa", "SizeGroup"))%>%
-  mutate(ID=paste(SampleID, Taxa, SizeGroup))%>%
-  left_join(Station,by="Station")
+  mutate(ID=paste(SampleID, Taxa, SizeGroup))
 
 #rm(Catch,Depth,Station,TrawlEffort,Sample,AgeBySizeMo)
 Suisun <- Suisun1%>%
