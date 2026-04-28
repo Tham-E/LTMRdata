@@ -96,6 +96,7 @@ data <- bind_rows(
 #            SampleTime=as.POSIXct(paste0("1985-01-01 ",SampleTime),"%Y-%m-%d %H:%M:%S",tz="America/Los_Angeles")
 # )
 summary(datatest$SampleTime)
+source(file.path("data-raw","Species.R"))
 # Check to see if there are new Taxa added to the dataset:
 USFWS_Species <- Species %>%
   select(USFWS_Code, Taxa) %>%
@@ -178,4 +179,4 @@ report<- generateComparisonReport(DJFMP, LTMRdata::DJFMP,
                                   idCols = c("SampleID", "Taxa", "Length", "Count"))
 
 # Save compressed data to /data
-usethis::use_data(DJFMP, overwrite=TRUE, compress="xz")
+usethis::use_data(DJFMP, overwrite=TRUE, compress="bzip2")
